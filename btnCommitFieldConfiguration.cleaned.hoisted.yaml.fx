@@ -83,16 +83,6 @@ With(
                 // TARGET COMBINED configuration
                 "target-combined",
                 {
-                    fieldId: currentField.fieldId,
-                    targetColumnId: currentField.targetColumnId,
-                    targetColumnTitle: currentField.targetColumnTitle,
-                    targetColumnType: currentField.targetColumnType,
-                    targetColumnIndex: currentField.targetColumnIndex,
-                    controlType: currentField.controlType,
-                    section: "primary",
-                    isRequired: currentField.isRequired,
-                    allowMultiSelect: currentField.allowMultiSelect,
-                    displayOrder: currentField.displayOrder,
                     // Target combined specific
                     hasExternalSource: false,
                     externalSourceType: "",
@@ -109,17 +99,6 @@ With(
                 },
                 // COLUMN DEFINITION ONLY configuration (default for "target-column")
                 {
-                    fieldId: currentField.fieldId,
-                    targetColumnId: currentField.targetColumnId,
-                    targetColumnTitle: currentField.targetColumnTitle,
-                    targetColumnType: currentField.targetColumnType,
-                    targetColumnIndex: currentField.targetColumnIndex,
-                    controlType: currentField.controlType,
-                    section: "primary",
-                    isRequired: currentField.isRequired,
-                    allowMultiSelect: currentField.allowMultiSelect,
-                    displayOrder: currentField.displayOrder,
-                    // Column definition only specific
                     hasExternalSource: false,
                     externalSourceType: "",
                     optionSourceType: "column-definition",
@@ -162,31 +141,6 @@ With(
                     // Update primaryFields array
                     // Simpler: Always append (for single-field commits)
                     primaryFields: colPrimaryFields, // [finalFieldConfiguration],
-                    /*
-                    
-                    
-                    If(
-                        CountRows(currentPrimaryFields) = 0,
-                        [{name: "Yoko", age: 53}],
-                        [{name: "Juni", age: 70}]),
-        
-        
-                        // [finalFieldConfiguration],
-                        ForAll(
-                            Sequence(CountRows(currentPrimaryFields) + 1),
-                            If(
-                                Value <= CountRows(currentPrimaryFields),
-                                Index(
-                                    currentPrimaryFields,
-                                    Value
-                                ),
-                                [{name: "Yoko", age: 53}],
-                                // finalFieldConfiguration
-                            )
-                        )
-                    ),
-                    */
-
                     secondaryFields: currentConfig.secondaryFields
                 }
             )
