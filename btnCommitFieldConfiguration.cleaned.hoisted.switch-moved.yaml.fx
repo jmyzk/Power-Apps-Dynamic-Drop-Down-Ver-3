@@ -161,31 +161,6 @@ With(
                     // Update primaryFields array
                     // Simpler: Always append (for single-field commits)
                     primaryFields: colPrimaryFields, // [finalFieldConfiguration],
-                    /*
-                    
-                    
-                    If(
-                        CountRows(currentPrimaryFields) = 0,
-                        [{name: "Yoko", age: 53}],
-                        [{name: "Juni", age: 70}]),
-        
-        
-                        // [finalFieldConfiguration],
-                        ForAll(
-                            Sequence(CountRows(currentPrimaryFields) + 1),
-                            If(
-                                Value <= CountRows(currentPrimaryFields),
-                                Index(
-                                    currentPrimaryFields,
-                                    Value
-                                ),
-                                [{name: "Yoko", age: 53}],
-                                // finalFieldConfiguration
-                            )
-                        )
-                    ),
-                    */
-
                     secondaryFields: currentConfig.secondaryFields
                 }
             )
