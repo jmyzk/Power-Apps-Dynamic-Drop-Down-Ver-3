@@ -15,13 +15,86 @@ If(
     );
     Exit()
 );
-// 2. GET CURRENT FIELD AND SHAREPOINT DATA
+// 2. GET CURRENT FIELD AND SET VARIABLES
+Set(
+    varCurrentField,
+    LookUp(
+        colPrimaryFields,
+        targetColumnId = varCurrentFieldColumnId
+    )
+);
+
+// 3. SET SOURCE-SPECIFIC CONFIGURATION VARIABLES
+Set(
+    varHasExternalSource,
+    Switch(
+        varOptionsSource,
+        "external-source", true,
+        false
+    )
+);
+
+Set(
+    varExternalSourceType,
+    Switch(
+        varOptionsSource,
+        "external-source", "EXTERNAL_SHEET",
+        ""
+    )
+);
+
+Set(
+    varOptionSourceType,
+    Switch(
+        varOptionsSource,
+        "external-source", "external-source",
+        "target-combined", "target-combined",
+        "column-definition"
+    )
+);
+
+Set(
+    varOptionSourceConfig,
+    Switch(
+        varOptionsSource,
+        "external-source",
+        {
+            type: "EXTERNAL_SHEET",
+            sheetId: varConfirmedExternalSheetID,
+            sheetName: varConfirmedSheetName,
+            columnId: varConfirmedExternalColumn.id,
+            columnTitle: varConfirmedExternalColumn.title,
+            columnType: varConfirmedExternalColumn.type,
+            previewCount: CountRows(varPreviewOptions),
+            configuredDate: Text(
+                Now(),
+                "yyyy-mm-ddThh:mm:ssZ"
+            )
+        },
+        "target-combined",
+        {
+            type: "TARGET_COMBINED",
+            useColumnDefinition: true,
+            useTargetSheetData: true,
+            configuredDate: Text(
+                Now(),
+                "yyyy-mm-ddThh:mm:ssZ"
+            )
+        },
+        {
+            type: "COLUMN_DEFINITION",
+            useColumnDefinition: true,
+            configuredDate: Text(
+                Now(),
+                "yyyy-mm-ddThh:mm:ssZ"
+            )
+        }
+    )
+);
+
+// 4. GET SHAREPOINT DATA AND BUILD CONFIGURATION
 With(
     {
-        currentField: LookUp(
-            colPrimaryFields,
-            targetColumnId = varCurrentFieldColumnId
-        ),
         // Get current SharePoint record
         currentRecord: LookUp(
             'Form Definition Admin',
@@ -35,90 +108,31 @@ With(
             )
         )
     },
-    // 3. BUILD FIELD CONFIGURATION based on varOptionsSource
+    // 5. BUILD FIELD CONFIGURATION using pre-set variables
     With(
         {
-            // Common field properties (moved outside of Switch)
-            baseFieldConfig: {
-                fieldId: currentField.fieldId,
-                targetColumnId: currentField.targetColumnId,
-                targetColumnTitle: currentField.targetColumnTitle,
-                targetColumnType: currentField.targetColumnType,
-                targetColumnIndex: currentField.targetColumnIndex,
-                controlType: currentField.controlType,
+            finalFieldConfiguration: {
+                fieldId: varCurrentField.fieldId,
+                targetColumnId: varCurrentField.targetColumnId,
+                targetColumnTitle: varCurrentField.targetColumnTitle,
+                targetColumnType: varCurrentField.targetColumnType,
+                targetColumnIndex: varCurrentField.targetColumnIndex,
+                controlType: varCurrentField.controlType,
                 section: "primary",
-                isRequired: currentField.isRequired,
-                allowMultiSelect: currentField.allowMultiSelect,
-                displayOrder: currentField.displayOrder
+                isRequired: varCurrentField.isRequired,
+                allowMultiSelect: varCurrentField.allowMultiSelect,
+                displayOrder: varCurrentField.displayOrder,
+                // Source-specific properties using variables
+                hasExternalSource: varHasExternalSource,
+                externalSourceType: varExternalSourceType,
+                externalSheetId: If(varOptionsSource = "external-source", varConfirmedExternalSheetID, ""),
+                externalSheetName: If(varOptionsSource = "external-source", varConfirmedSheetName, ""),
+                externalColumnId: If(varOptionsSource = "external-source", Text(varConfirmedExternalColumn.id), ""),
+                externalColumnTitle: If(varOptionsSource = "external-source", varConfirmedExternalColumn.title, ""),
+                externalColumnType: If(varOptionsSource = "external-source", varConfirmedExternalColumn.type, ""),
+                optionSourceType: varOptionSourceType,
+                optionSourceConfig: varOptionSourceConfig
             },
-            
-            // Source-specific configuration
-            sourceSpecificConfig: Switch(
-                varOptionsSource,
-                // EXTERNAL SOURCE configuration
-                "external-source",
-                {
-                    // External source specific
-                    hasExternalSource: true,
-                    externalSourceType: "EXTERNAL_SHEET",
-                    externalSheetId: varConfirmedExternalSheetID,
-                    externalSheetName: varConfirmedSheetName,
-                    externalColumnId: Text(varConfirmedExternalColumn.id),
-                    externalColumnTitle: varConfirmedExternalColumn.title,
-                    externalColumnType: varConfirmedExternalColumn.type,
-                    optionSourceType: "external-source",
-                    optionSourceConfig: {
-                        type: "EXTERNAL_SHEET",
-                        sheetId: varConfirmedExternalSheetID,
-                        sheetName: varConfirmedSheetName,
-                        columnId: varConfirmedExternalColumn.id,
-                        columnTitle: varConfirmedExternalColumn.title,
-                        columnType: varConfirmedExternalColumn.type,
-                        previewCount: CountRows(varPreviewOptions),
-                        configuredDate: Text(
-                            Now(),
-                            "yyyy-mm-ddThh:mm:ssZ"
-                        )
-                    }
-                },
-                // TARGET COMBINED configuration
-                "target-combined",
-                {
-                    // Target combined specific
-                    hasExternalSource: false,
-                    externalSourceType: "",
-                    optionSourceType: "target-combined",
-                    optionSourceConfig: {
-                        type: "TARGET_COMBINED",
-                        useColumnDefinition: true,
-                        useTargetSheetData: true,
-                        configuredDate: Text(
-                            Now(),
-                            "yyyy-mm-ddThh:mm:ssZ"
-                        )
-                    }
-                },
-                // COLUMN DEFINITION ONLY configuration (default for "target-column")
-                {
-                    // Column definition only specific
-                    hasExternalSource: false,
-                    externalSourceType: "",
-                    optionSourceType: "column-definition",
-                    optionSourceConfig: {
-                        type: "COLUMN_DEFINITION",
-                        useColumnDefinition: true,
-                        configuredDate: Text(
-                            Now(),
-                            "yyyy-mm-ddThh:mm:ssZ"
-                        )
-                    }
-                }
-            ), // Switch
-            
-            // Combine base config with source-specific config
-            finalFieldConfiguration: 
-                baseFieldConfig & sourceSpecificConfig,
-            
             // ✅ FIXED: Handle empty primaryFields array properly
             currentPrimaryFields: // Table(currentConfig.primaryFields)// Convert to table if exists
             If(
@@ -127,8 +141,8 @@ With(
                 Table(currentConfig.primaryFields)// Convert to table if exists
             )
         },
-        // 4. UPDATE SHAREPOINT JSON CONFIGURATION
-        ClearCollect(colFrimaryField, currentField);
+        // 6. UPDATE SHAREPOINT JSON CONFIGURATION
+        ClearCollect(colPrimaryField, varCurrentField);
         Collect(colPrimaryField,finalFieldConfiguration);
         Set(
             varUpdatedFormConfigJSON,
@@ -152,10 +166,10 @@ With(
                 }
             )
         )// End Set and JSON
-    )// End With for section 3
+    )// End With for section 5
 );
-// End With for section 2
-// 5. UPDATE SHAREPOINT RECORD
+// End With for section 4
+// 7. UPDATE SHAREPOINT RECORD
 With(
     {
         // Count external fields directly from local collection instead of parsing JSON
@@ -182,7 +196,7 @@ With(
         }
     )
 );
-// 6. UPDATE EXTERNAL SHEETS REGISTRY (only if external source selected)
+// 8. UPDATE EXTERNAL SHEETS REGISTRY (only if external source selected)
 If(
     varOptionsSource = "external-source" && varExternalSelectionConfirmed,
     Patch(
@@ -201,7 +215,7 @@ If(
         }
     )
 );
-// 7. UPDATE LOCAL COLLECTION for UI display
+// 9. UPDATE LOCAL COLLECTION for UI display
 Patch(
     colPrimaryFields,
     LookUp(
@@ -223,7 +237,7 @@ Patch(
         lastModified: Now()
     }
 );
-// 8. RESET CONFIGURATION STATE
+// 10. RESET CONFIGURATION STATE
 Set(
     varExternalSelectionConfirmed,
     false
@@ -236,7 +250,7 @@ Set(
     varShowConfigPanel,
     false
 );
-// 9. SUCCESS NOTIFICATION
+// 11. SUCCESS NOTIFICATION
 With(
     {
         fieldTitle: LookUp(
@@ -259,7 +273,7 @@ With(
         3000
     )
 );
-// 10. TRIGGER UI REFRESH
+// 12. TRIGGER UI REFRESH
 Set(
     varGlobalRefresh,
     !varGlobalRefresh
