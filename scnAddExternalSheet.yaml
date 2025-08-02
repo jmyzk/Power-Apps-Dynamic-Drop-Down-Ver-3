@@ -1,0 +1,502 @@
+Screens:
+  scnAddExternalSheet:
+    Properties:
+      LoadingSpinnerColor: =RGBA(56, 96, 178, 1)
+    Children:
+      - conScnAddExternalSheet:
+          Control: GroupContainer@1.3.0
+          Variant: AutoLayout
+          Properties:
+            Fill: =RGBA(245, 245, 245, 1)
+            Height: =Parent.Height
+            LayoutAlignItems: =LayoutAlignItems.Stretch
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutGap: =16
+            PaddingBottom: =16
+            PaddingLeft: =16
+            PaddingRight: =16
+            PaddingTop: =16
+            Width: =Parent.Width
+          Children:
+            - HeaderContainerNewSheet:
+                Control: GroupContainer@1.3.0
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =75
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+                Children:
+                  - lblSheetIDPrompt:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        FontWeight: =FontWeight.Bold
+                        Text: ="Enter Smartsheet ID"
+                        Width: =300
+                  - txtSheetID:
+                      Control: Classic/TextInput@2.3.2
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Default: =6725030659444612
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =RGBA(0, 18, 107, 1)
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        X: =40
+                        Y: =8
+                  - rctHeder:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - btnLoadSheet:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: |-
+                          =Set(valShowWholeCell,false);
+                          Set(varSelected,false);
+                          Set(varWholeCell,"");
+                          Set(
+                              varSheet,
+                              Smartsheet.GetSheet(txtSheetID.Text)
+                          );
+                          Set(
+                              varColumns,
+                              varSheet.columns
+                          );
+
+                          Set(totalColumnCount, Max(varColumns, index)+1);
+
+
+                          Clear(colSheet);
+                          ForAll(
+                              Filter(
+                                  varSheet.rows,
+                                  rowNumber <= 10
+                              ),
+                              With(
+                                  {Cells: cells},
+                                  ForAll(
+                                      Cells,
+                                      Collect(
+                                          colSheet,
+                                          {
+                                              columnTitle: LookUp(
+                                                  varColumns,
+                                                  id = columnId,
+                                                  title
+                                              ),
+                                              columnWidth: LookUp(
+                                                  varColumns,
+                                                  id = columnId,
+                                                  width
+                                              ),
+                                              data: displayValue
+                                          }
+                                      )
+                                  )
+                              )
+                          );
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Text: ="Load Sheet"
+                        X: =432
+                        Y: =8
+                  - rctHeder_1:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - btnBack:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: |-
+                          =Set(varWholeCell, "");
+                          Navigate('Form Screen');
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Navigate back to main screen"
+                        X: =300
+                  - rctHeder_2:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - btnCancel:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: =
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Reset and navigate back"
+            - MainContainerNewSheet:
+                Control: GroupContainer@1.3.0
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =Parent.Height*75%
+                  LayoutDirection: =LayoutDirection.Vertical
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+                Children:
+                  - conSheetPreview:
+                      Control: GroupContainer@1.3.0
+                      Variant: ManualLayout
+                      Properties:
+                        Height: =Parent.Height*2/3
+                        Width: =1265
+                        X: =40
+                        Y: =80
+                      Children:
+                        - galSheetPreview:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Horizontal_TwoTextOneImageOverlayVariant_ver5.0
+                            Properties:
+                              BorderColor: =RGBA(0, 18, 107, 1)
+                              Height: =Parent.Height*90%
+                              Items: =colSheet
+                              ShowScrollbar: =false
+                              TemplateSize: =120
+                              Visible: =CountRows(colSheet) > 0
+                              Width: =1192
+                              X: =20 -Slider.Value*10
+                              Y: =20
+                            Children:
+                              - galRowCells_2:
+                                  Control: Gallery@2.15.0
+                                  Variant: BrowseLayout_Vertical_TwoTextVariant_ver5.0
+                                  Properties:
+                                    BorderColor: =RGBA(0, 18, 107, 1)
+                                    Height: =341
+                                    Items: |-
+                                      =Filter(
+                                          colSheet,
+                                          columnTitle = ThisItem.columnTitle,
+                                          data
+                                      )
+                                    OnSelect: |
+                                      =
+                                    TemplateSize: =40
+                                    Width: =120
+                                    Y: =lblColumTitleNewSheet.Y+lblColumTitleNewSheet.Height+20
+                                  Children:
+                                    - lblCelValue_2:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          BorderColor: =RGBA(0, 0, 0, 1)
+                                          Color: =RGBA(50, 49, 48, 1)
+                                          Font: =Font.'Open Sans'
+                                          FontWeight: =If(ThisItem.IsSelected, FontWeight.Semibold, FontWeight.Normal)
+                                          Height: =20
+                                          OnSelect: |-
+                                            =Set(varSelected, true);
+                                            Set(varWholeCell,ThisItem.data)
+                                          PaddingBottom: =0
+                                          PaddingLeft: =0
+                                          PaddingRight: =0
+                                          PaddingTop: =0
+                                          Size: =12
+                                          Text: =ThisItem.data
+                                          VerticalAlign: =VerticalAlign.Top
+                                          Width: =Parent.TemplateWidth - 20
+                                          X: =16
+                                          Y: =(Parent.TemplateHeight - (Self.Size * 1.8 )) / 2
+                              - lblColumTitleNewSheet:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Align: =Align.Center
+                                    BorderColor: =RGBA(0, 18, 107, 1)
+                                    Color: =RGBA(255, 255, 255, 1)
+                                    Fill: =RGBA(56, 96, 178, 1)
+                                    Font: =Font.'Open Sans'
+                                    FontWeight: =FontWeight.Bold
+                                    Height: =50
+                                    Size: =11
+                                    Text: =ThisItem.columnTitle
+                                    Width: =120
+            - FooterContainerNewSheet:
+                Control: GroupContainer@1.3.0
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =75
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+                Children:
+                  - Slider:
+                      Control: Classic/Slider@2.1.0
+                      Properties:
+                        AlignInContainer: =AlignInContainer.Center
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Default: =0
+                        ValueFill: =RGBA(0, 18, 107, 1)
+                        X: =472
+                        Y: =703
+                  - rctFooter:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - lblCellDetail:
+                      Control: Label@2.5.1
+                      Properties:
+                        AlignInContainer: =AlignInContainer.Center
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Color: =RGBA(0, 0, 0, 0.50)
+                        Fill: =RGBA(255, 255, 255, 20)
+                        Font: =Font.'Open Sans'
+                        Height: =20
+                        Size: =12
+                        Text: |-
+                          =If(
+                              varWholeCell="",
+                              "(Whole cell display value}",
+                              varWholeCell
+                          )
+                        Width: =500
+                        X: =845
+                  - rctFooter_1:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - rctFooter_2:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =200
+                  - btnUseDirectly:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        AlignInContainer: =AlignInContainer.Center
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Use Without Saving"
+                        Width: =200
+                        Y: =20
+            - MetadataContainerNewSheet:
+                Control: GroupContainer@1.3.0
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =40
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+                  X: =40
+                  Y: =40
+                Children:
+                  - rctMetadata:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - txtDisplayName:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        Text: =varSheet.name
+                        Width: =300
+                  - rctMetadata_1:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - ddlCategory:
+                      Control: Classic/DropDown@2.3.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        ChevronBackground: =RGBA(56, 96, 178, 1)
+                        ChevronFill: =RGBA(255, 255, 255, 1)
+                        ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                        Font: =Font.'Open Sans'
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Items: = ["Employee Data", "Project Data", "Reference Data", "Other"]
+                        Items.Value: =Value
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 18, 107, 1)
+                        SelectionColor: =RGBA(255, 255, 255, 1)
+                        SelectionFill: =RGBA(56, 96, 178, 1)
+                        Width: =200
+                  - rctMetadata_2:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =40
+                  - txtDescription:
+                      Control: Classic/TextInput@2.3.2
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Default: =""
+                        Font: =Font.'Open Sans'
+                        HintText: ="Brief description of this sheet's purpose"
+                        HoverBorderColor: =RGBA(0, 18, 107, 1)
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Width: =400
+                  - rctMetadata_3:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =20
+                  - txtTags:
+                      Control: Classic/TextInput@2.3.2
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Default: =
+                        Font: =Font.'Open Sans'
+                        HintText: ="tag"
+                        HoverBorderColor: =RGBA(0, 18, 107, 1)
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Width: =120
+                  - rctMetadata_4:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =Parent.Height
+                        Width: =40
+                  - btnAddToRegistry:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        AlignInContainer: =AlignInContainer.Center
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: |+
+                          =Patch(
+                              'External Option Sheets',
+                              Defaults('External Option Sheets'),
+                              {
+                                  Title: txtSheetID.Text,
+                                  DisplayName: txtDisplayName.Text,
+                                  SheetID: txtSheetID.Text,
+                                  Description: txtDescription.Text,
+                                  Category: ddlCategory.SelectedText,
+                                  Tags: txtTags.Text,
+                                  Status: ddStatus.SelectedText,
+                                  LastSynced: Now()
+                              }
+                          );
+                          // update colExternalSheetsRegistry,
+                          ClearCollect(
+                              colExternalSheetsRegistry,
+                              Filter(
+                                  'External Option Sheets',
+                                  Status.Value = "Active"
+                              )
+                          );
+
+                          Set(varBackFromscnAddExternalSheetAddToRegistry, true);
+
+                          // Navigate back with success message
+                          Navigate(
+                              'Form Screen',
+                              ScreenTransition.Fade
+                          );
+
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Add to Registry"
+                        X: =40
+                        Y: =40
+                  - ddStatus:
+                      Control: Classic/DropDown@2.3.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        ChevronBackground: =RGBA(56, 96, 178, 1)
+                        ChevronFill: =RGBA(255, 255, 255, 1)
+                        ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                        Font: =Font.'Open Sans'
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Items: =["Active"]
+                        Items.Value: =Value
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 18, 107, 1)
+                        SelectionColor: =RGBA(255, 255, 255, 1)
+                        SelectionFill: =RGBA(56, 96, 178, 1)
+                        Visible: =false
