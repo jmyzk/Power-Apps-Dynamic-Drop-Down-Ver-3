@@ -1,0 +1,819 @@
+Screens:
+  Cascade Builder Screen:
+    Properties:
+      LoadingSpinnerColor: =RGBA(56, 96, 178, 1)
+    Children:
+      - ComboBox1:
+          Control: Classic/ComboBox@2.4.0
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            ChevronBackground: =RGBA(56, 96, 178, 1)
+            ChevronFill: =RGBA(255, 255, 255, 1)
+            ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            ChevronHoverFill: =RGBA(255, 255, 255, 1)
+            DisplayFields: =["title"]
+            Font: =Font.'Open Sans'
+            Height: =44
+            HoverFill: =RGBA(186, 202, 226, 1)
+            Items: =colSheetColumns
+            PressedColor: =RGBA(255, 255, 255, 1)
+            PressedFill: =RGBA(0, 18, 107, 1)
+            SearchFields: =["title"]
+            SelectionColor: =RGBA(255, 255, 255, 1)
+            SelectionFill: =RGBA(56, 96, 178, 1)
+            Width: =231
+            X: =163
+            Y: =82
+      - galSelectColumns:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Height: =522
+            Items: =ComboBox1.SelectedItems
+            Width: =331
+            X: =40
+            Y: =143
+          Children:
+            - Title2:
+                Control: Label@2.5.1
+                Properties:
+                  BorderColor: =RGBA(0, 0, 0, 1)
+                  Color: =RGBA(50, 49, 48, 1)
+                  Font: =Font.'Open Sans'
+                  FontWeight: =If(ThisItem.IsSelected, FontWeight.Semibold, FontWeight.Normal)
+                  Height: =Self.Size * 1.8
+                  OnSelect: =Select(Parent)
+                  PaddingBottom: =0
+                  PaddingLeft: =0
+                  PaddingRight: =0
+                  PaddingTop: =0
+                  Size: =14
+                  Text: =ThisItem.title
+                  VerticalAlign: =VerticalAlign.Top
+                  Width: =Parent.TemplateWidth - 86
+                  X: =16
+                  Y: =(Parent.TemplateHeight / 2) - (Self.Height / 2)
+            - NextArrow2:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  AccessibleLabel: =Self.Tooltip
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Color: =RGBA(166, 166, 166, 1)
+                  Height: =50
+                  Icon: =Icon.ChevronRight
+                  OnSelect: |+
+                    =Select(Parent);
+                  PaddingBottom: =12
+                  PaddingLeft: =12
+                  PaddingRight: =12
+                  PaddingTop: =12
+                  Tooltip: ="View item details"
+                  Visible: =false
+                  Width: =50
+                  X: =Parent.TemplateWidth - Self.Width - 12
+                  Y: =(Parent.TemplateHeight / 2) - (Self.Height / 2)
+            - Separator2:
+                Control: Rectangle@2.3.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =8
+                  OnSelect: =Select(Parent)
+                  Width: =Parent.TemplateWidth
+                  Y: =Parent.TemplateHeight - Self.Height
+            - Rectangle2:
+                Control: Rectangle@2.3.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Fill: =RGBA(0, 18, 107, 1)
+                  Height: =Parent.TemplateHeight - Separator2.Height
+                  OnSelect: =Select(Parent)
+                  Visible: =ThisItem.IsSelected
+                  Width: =4
+      - galDropdownSetting:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Height: =603
+            Items: =colComboSelection
+            OnSelect: =Set(VarOptIndex,0)
+            Width: =904
+            X: =443
+            Y: =143
+          Children:
+            - ComboBox2:
+                Control: Classic/ComboBox@2.4.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  ChevronBackground: =RGBA(56, 96, 178, 1)
+                  ChevronFill: =RGBA(255, 255, 255, 1)
+                  ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                  ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                  Default: |-
+                    =// SIMPLIFIED DEFAULT - Just show collection value
+                    With(
+                              {selectedVal: LookUp(colComboSelection, id = ThisItem.id, selectedValue)},
+                              If(selectedVal <> "", {Value: selectedVal}, Blank())
+                          )
+
+                    /*
+                    If(
+                              LookUp(colComboSelection, id = ThisItem.id, selectedValue) <> "",
+                              {Value: LookUp(colComboSelection, id = ThisItem.id, selectedValue)},
+                              Blank()
+                          )
+                    */
+                  DefaultSelectedItems: |-
+                    =// If(ThisItem.selectedValue<>"",[{Value:ThisItem.selectedValue}],[])
+
+                    /*
+                    If(
+                              LookUp(colComboSelection, id = ThisItem.id, selectedValue) <> "",
+                              {Value: LookUp(colComboSelection, id = ThisItem.id, selectedValue)},
+                              Blank()
+                          )
+                          */
+                  DisplayFields: =["Value"]
+                  Font: =Font.'Open Sans'
+                  HoverFill: =RGBA(186, 202, 226, 1)
+                  IsSearchable: =false
+                  Items: "=// ====================================================================\n// カスケードドロップダウンの動的選択肢フィルタリングロジック\n// ====================================================================\n// 目的: 他のドロップダウンの選択状態に基づいて、現在のドロップダウンに\n//       表示する選択肢を動的にフィルタリングし、データの整合性を保つ\n// ====================================================================\n\n// 旧版（コメントアウト）- 参考用\n// Distinct(ForAll(colSheetRows,With({currentRowCells:cells,currentValue:Coalesce(LookUp(cells,columnId=ThisItem.id,displayValue),\"\")&\"\"},If(currentValue<>\"\"&&CountRows(Filter(colComboSelection,selectedValue<>\"\"&&id<>ThisItem.id&&selectedValue<>With({otherColumnId:ThisRecord.id},Coalesce(LookUp(currentRowCells,columnId=otherColumnId,displayValue),\"\")&\"\")))=0,currentValue,Blank()))),Value)\n\n\nDistinct(\n   ForAll(\n       colSheetRows,                    // Smartsheetの全データ行をループ処理\n       With(\n           {\n               currentRowCells: cells,  // 現在処理中の行の全セル情報\n               currentValue: Coalesce(  // 現在のカラムの値を安全に取得\n                   LookUp(\n                       cells,\n                       columnId = ThisItem.id,     // 現在のドロップダウンのカラムIDで検索\n                       displayValue                // セルの表示値を取得\n                   ),\n                   \"\"                             // 値がnullの場合は空文字列を使用\n               ) & \"\"                            // 確実に文字列型に変換\n           },\n           If(\n               // ===== 表示条件の判定 =====\n               // 条件A: 値が存在 かつ 他のドロップダウンとの競合がない\n               (currentValue <> \"\" && CountRows(\n                   Filter(\n                       colComboSelection,          // カスケードドロップダウンの選択状態コレクション\n                       selectedValue <> \"\" &&     // 既に値が選択されているドロップダウン\n                       id <> ThisItem.id &&       // 現在のドロップダウン以外\n                       selectedValue <> With(      // 選択値と現在行での値が異なる（競合チェック）\n                           {otherColumnId: ThisRecord.id},\n                           Coalesce(\n                               LookUp(\n                                   currentRowCells,        // 現在の行のセル情報から\n                                   columnId = otherColumnId, // 他のカラムの値を取得\n                                   displayValue\n                               ),\n                               \"\"\n                           ) & \"\"\n                       )\n                   )\n               ) = 0) ||                          // 競合するドロップダウンが0個 = 競合なし\n               // 条件B: 現在の選択値と同じ（既選択値は常に表示）\n               currentValue = ThisItem.selectedValue,\n               \n               currentValue,                      // 条件に合致 → 値を返す\n               Blank()                           // 条件に合致しない → 空白（除外）\n           )\n       )\n   ),\n   Value                                         // Distinctで重複除去する際のフィールド指定\n)\n\n// ====================================================================\n// 動作例:\n// データ: [トヨタ-プリウス-2020], [トヨタ-カムリ-2021], [ホンダ-シビック-2020]\n// \n// 1. メーカーで「トヨタ」選択\n// 2. モデルのフィルタリング:\n//    - [トヨタ-プリウス-2020] → メーカー一致 → \"プリウス\"表示\n//    - [トヨタ-カムリ-2021] → メーカー一致 → \"カムリ\"表示  \n//    - [ホンダ-シビック-2020] → メーカー不一致 → 除外\n//    結果: [プリウス, カムリ]のみ表示\n// ====================================================================\n// この仕組みにより、選択の組み合わせが必ず実在するデータ行に対応することを保証\n// ====================================================================\n\n\n"
+                  OnChange: |
+                    =UpdateIf(
+                              colComboSelection,
+                              id = ThisItem.id,
+                              {
+                                  selectedValue: Coalesce(
+                                      First(ComboBox2.SelectedItems).Value,
+                                      ""
+                                  ),
+                                  userSelectedSource: true  // ✅ Mark as user-selected
+                              }
+                          )
+
+
+                    /*
+                    UpdateIf(
+                        colComboSelection,
+                        id = ThisItem.id,
+                        {
+                            selectedValue: Coalesce(
+                                First(ComboBox2.SelectedItems).Value,
+                                ""
+                            )
+                        }
+                    )
+
+                    */
+                  PressedColor: =RGBA(255, 255, 255, 1)
+                  PressedFill: =RGBA(0, 18, 107, 1)
+                  SearchFields: =["Value"]
+                  SelectionColor: =RGBA(255, 255, 255, 1)
+                  SelectionFill: =RGBA(56, 96, 178, 1)
+                  Width: =300
+                  X: =200
+                  Y: =20
+            - Separator4:
+                Control: Rectangle@2.3.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =8
+                  OnSelect: =Select(Parent)
+                  Width: =Parent.TemplateWidth
+                  Y: =Parent.TemplateHeight - Self.Height
+            - Rectangle4:
+                Control: Rectangle@2.3.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Fill: =RGBA(0, 18, 107, 1)
+                  Height: =Parent.TemplateHeight - Separator4.Height
+                  OnSelect: =Select(Parent)
+                  Visible: =ThisItem.IsSelected
+                  Width: =4
+            - Label1:
+                Control: Label@2.5.1
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Font: =Font.'Open Sans'
+                  Text: =ThisItem.title
+                  X: =40
+                  Y: =20
+            - Label1_1:
+                Control: Label@2.5.1
+                Properties:
+                  Align: =Align.Center
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Font: =Font.'Open Sans'
+                  Text: |-
+                    =// ThisItem.selectedValue
+
+                    LookUp(
+                        colComboSelection,
+                        id = ThisItem.id,
+                        selectedValue
+                    )
+                  Visible: |-
+                    =// ThisItem.selectedValue <> "" && CountRows(ComboBox2.SelectedItems) = 0
+                    // ThisItem.selectedValue <> ""
+                    //true
+                    /*
+                    LookUp(
+                        colComboSelection,
+                        id = ThisItem.id,
+                        selectedValue
+                    ) <> ""
+                    */
+
+                    LookUp(colComboSelection, id = ThisItem.id, userSelectedSource) = true
+                  Width: =269
+                  X: =200
+                  Y: =20
+            - IcnResetBelow:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Color: =RGBA(0, 18, 107, 1)
+                  Height: =48
+                  Icon: =Icon.ChevronDown
+                  OnSelect: "=// ====================================================================\r\n// カスケードドロップダウンのリセット処理（階層的クリア機能）\r\n// ====================================================================\r\n// 目的: 現在のドロップダウンの選択をクリアし、それより下位（position値が大きい）\r\n//       の全てのドロップダウンの選択も連鎖的にクリアする\r\n// ====================================================================\r\n\r\n\r\nWith(\r\n   {currentPosition: LookUp(colComboSelection, id = ThisItem.id, position)},\r\n   // 現在のアイテムのposition値を取得\r\n   // 例: メーカー=1, モデル=2, 年式=3 の場合、モデルなら position=2 を取得\r\n   \r\n   // 現在のアイテム以降（同じposition以上）の全選択値をクリア\r\n   UpdateIf(\r\n       colComboSelection,                    // カスケードドロップダウンの状態管理コレクション\r\n       position >= currentPosition,          // 現在のposition以上のアイテムを対象\r\n       {selectedValue: \"\"}                   // 選択値を空文字列にリセット\r\n   )\r\n);\r\n\r\nSet(varGlobalRefresh, !varGlobalRefresh);     // 画面の強制再描画トリガー\r\n                                            // ブール値を反転させることで、バインドされた\r\n                                            // コントロールの再評価・再描画を促す\r\n\r\n\r\n\r\n// ====================================================================\r\n// 動作例:\r\n// 現在の状態: [メーカー:\"トヨタ\"(pos:1), モデル:\"プリウス\"(pos:2), 年式:\"2020\"(pos:3)]\r\n// \r\n// メーカーのリセットボタンを押した場合:\r\n// 1. currentPosition = 1 を取得\r\n// 2. position >= 1 の全アイテム（メーカー、モデル、年式）をクリア\r\n// 3. 結果: [メーカー:\"\"(pos:1), モデル:\"\"(pos:2), 年式:\"\"(pos:3)]\r\n//\r\n// モデルのリセットボタンを押した場合:\r\n// 1. currentPosition = 2 を取得  \r\n// 2. position >= 2 の全アイテム（モデル、年式）をクリア\r\n// 3. 結果: [メーカー:\"トヨタ\"(pos:1), モデル:\"\"(pos:2), 年式:\"\"(pos:3)]\r\n// ====================================================================\r\n// この階層的リセット機能により、データの整合性を保ちながら\r\n// ユーザーが選択をやり直せる直感的なUXを提供\r\n// ====================================================================\r\n\r\n"
+                  Width: =36
+                  X: =518
+                  Y: =15
+            - cmbTargetColumn:
+                Control: Classic/ComboBox@2.4.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  ChevronBackground: =RGBA(56, 96, 178, 1)
+                  ChevronFill: =RGBA(255, 255, 255, 1)
+                  ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                  ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                  DefaultSelectedItems: |-
+                    =// [{title: LookUp(colComboSelection, id = ThisItem.id, targetColumnTitle)}]
+                    With(
+                            {targetTitle: LookUp(colComboSelection, id = ThisItem.id, targetColumnTitle)},
+                            If(
+                                targetTitle <> "",
+                                [{title: targetTitle}],  // Show the selected target
+                                []                       // Empty if nothing selected
+                            )
+                        )
+                  DisplayFields: =["title"]
+                  Fill: |-
+                    =// RGBA(255, 255, 255, 1)
+
+                    With(
+                            {targetTitle: LookUp(colComboSelection, id = ThisItem.id, targetColumnTitle)},
+                            If(
+                                targetTitle <> "" && targetTitle <> ThisItem.title,
+                                RGBA(230, 255, 230, 1),  // Light green if user selected different
+                                If(
+                                    targetTitle <> "" && targetTitle = ThisItem.title,
+                                    RGBA(230, 230, 255, 1),  // Light blue if auto-matched
+                                    RGBA(255, 255, 255, 1)   // White if nothing selected
+                                )
+                            )
+                        )
+                  Font: =Font.'Open Sans'
+                  HoverFill: =RGBA(186, 202, 226, 1)
+                  Items: |-
+                    =// Filter out already mapped target columns
+                      Filter(
+                          colTargetColumns,
+                          // Always include current dropdown's selection (default or stored)
+                          title = If(
+                              CountRows(Filter(colTargetColumns, title = ThisItem.title)) > 0,
+                              ThisItem.title,  // Auto-matched default
+                              LookUp(colComboSelection, id = ThisItem.id, targetColumnTitle)  // Stored selection
+                          ) ||
+                          // OR include if not taken by other dropdowns (including their defaults)
+                          Not(title in 
+                              ForAll(
+                                  Filter(colComboSelection, id <> ThisItem.id),  // Other dropdowns
+                                  With(
+                                      {
+                                          otherStored: ThisRecord.targetColumnTitle,
+                                          otherDefault: If(
+                                              CountRows(Filter(colTargetColumns, title = ThisRecord.title)) > 0,
+                                              ThisRecord.title,
+                                              ""
+                                          )
+                                      },
+                                      If(otherStored <> "", otherStored, otherDefault)  // Use stored OR default
+                                  )
+                              ).Value
+                          )
+                      )
+                  OnChange: |-
+                    =// ====================================================================
+                    // cmbTargetColumn.OnChange - SIMPLIFIED for new scheme
+                    // Purpose: Only update targetColumnTitle and isTargetMapped
+                    // Used for 1. UI improvement and at Button 4
+                    // Button 4 will handle complete target data enrichment
+                    // ====================================================================
+
+                    With(
+                        {
+                            selectedTarget: First(Self.SelectedItems),
+                            currentRecord: ThisItem
+                        },
+                        Patch(
+                            colComboSelection,
+                            LookUp(colComboSelection, id = currentRecord.id),
+                            {
+                                // ✅ MINIMAL UPDATE - Only what's needed for UI
+                                targetColumnTitle: If(Not(IsBlank(selectedTarget)), selectedTarget.title, ""),
+                                isTargetMapped: Not(IsBlank(selectedTarget))
+                                // userSelectedTarget: true  // Optional: if you want to track manual vs auto selection
+                            }
+                        )
+                    )
+                  OnSelect: =Select(Parent)
+                  PaddingLeft: |-
+                    =With(
+                            {
+                                targetTitle: LookUp(colComboSelection, id = ThisItem.id, targetColumnTitle),
+                                comboWidth: 320,           // Current width of ComboBox
+                                fontSize: 13,              // Font size (adjust to match your Font.Size)
+                                chevronWidth: 32,          // Approximate width of dropdown chevron
+                                borderWidth: 2             // Border thickness
+                            },
+                            If(
+                                targetTitle <> "",
+                                // Calculate center position
+                                Max(
+                                    8,  // Minimum padding
+                                    (comboWidth - chevronWidth - borderWidth - (Len(targetTitle) * fontSize * 0.6)) / 2
+                                ),
+                                8  // Default padding when no selection
+                            )
+                        )
+                  PressedColor: =RGBA(255, 255, 255, 1)
+                  PressedFill: =RGBA(0, 18, 107, 1)
+                  SearchFields: =["title"]
+                  SelectMultiple: =false
+                  SelectionColor: =RGBA(255, 255, 255, 1)
+                  SelectionFill: =RGBA(56, 96, 178, 1)
+                  Visible: |+
+                    =/*
+                    With(
+                        {targetTitle: LookUp(colComboSelection, id = ThisItem.id, targetColumnTitle)},
+                        Not(targetTitle <> "" && targetTitle <> ThisItem.title)
+                    )
+                    */
+                    true
+                    /*
+                    With(
+                            {
+                                targetTitle: LookUp(colComboSelection, id = ThisItem.id, targetColumnTitle),
+                                sourceTitle: ThisItem.title
+                            },
+                            Not(targetTitle <> "" && targetTitle <> sourceTitle)
+                        )
+                        */
+
+                  Width: =320
+                  X: =572
+                  Y: =20
+      - btnGetSourceSheet:
+          Control: Classic/Button@2.2.0
+          Properties:
+            BorderColor: =ColorFade(Self.Fill, -15%)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(166, 166, 166, 1)
+            Fill: =RGBA(56, 96, 178, 1)
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+            HoverColor: =RGBA(255, 255, 255, 1)
+            HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            OnSelect: |
+              =
+              // ====================================================================
+              // BUTTON 1: btnGetSourceSheet.OnSelect
+              // Purpose: Import source sheet data only
+              // ====================================================================
+
+              Reset(ComboBox1);                              // Reset column selection
+
+              // Get source sheet data
+              Set(varSheetId, txtSourceSheetID.Text);
+              Set(varSheetData, Smartsheet.GetSheet(varSheetId));
+
+              // Extract source data collections
+              ClearCollect(colSheetColumns, varSheetData.columns);
+              ClearCollect(colSheetRows, varSheetData.rows);
+
+              // Initialize empty colComboSelection (structure only)
+              ClearCollect(colComboSelection, {});
+
+              // Optional: Show success message
+              // Notify("Source sheet loaded successfully!", NotificationType.Success);
+
+              Clear(colComboSelection);
+            PressedBorderColor: =Self.Fill
+            PressedColor: =Self.Fill
+            PressedFill: =Self.Color
+            Size: =8
+            Text: =" Load Source Sheet"
+            Width: =111
+            X: =40
+            Y: =85
+      - btnSetupCascade:
+          Control: Classic/Button@2.2.0
+          Properties:
+            BorderColor: =ColorFade(Self.Fill, -15%)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(166, 166, 166, 1)
+            Fill: =RGBA(56, 96, 178, 1)
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+            HoverColor: =RGBA(255, 255, 255, 1)
+            HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            OnSelect: "=// ====================================================================\n// BUTTON 2: btnSetupCascade.OnSelect (renamed from btnShowDropdownSetting)\n// Purpose: Create cascade structure from selected columns\n// ====================================================================\n\n// Validate that user has selected columns\nIf(\n    CountRows(ComboBox1.SelectedItems) = 0,\n    Notify(\"Please select columns first!\", NotificationType.Warning);\n    Exit()\n);\n\n\n// Create cascade collection with source info only\nClearCollect(\n    colComboSelection,\n    ForAll(\n        Sequence(CountRows(ComboBox1.SelectedItems)),\n        With(\n            {\n                selectedItem: Index(ComboBox1.SelectedItems, Value)\n            },\n            {\n                // PHASE 2: SOURCE FIELDS (from user selection)\n                id: selectedItem.id,\n                title: selectedItem.title,\n                type: selectedItem.type,\n                selectedValue: \"\",\n                position: Value,                    // This sets the cascade order!\n                userSelectedSource: false,\n                \n                // PHASE 3: TARGET FIELDS (empty until Button 3)\n                targetColumnId: \"\",\n                targetColumnTitle: \"\",\n                targetColumnType: \"\",\n                targetColumnIndex: -1,\n                // targetArrayIndex: -1,\n                allowMultiSelect: false,\n                isTargetMapped: false,\n                userSelectedTarget: false\n\n            }\n        )\n    )\n);\n\n// Optional: Show success message\n// Notify(\"Cascade structure created! You can now test the dependencies.\", NotificationType.Success);"
+            PressedBorderColor: =Self.Fill
+            PressedColor: =Self.Fill
+            PressedFill: =Self.Color
+            Size: =8
+            Text: ="Setup Cascade Order"
+            Width: =187
+            X: =443
+            Y: =82
+      - txtSourceSheetID:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Default: ="4175315564711812"
+            Font: =Font.'Open Sans'
+            Height: =37
+            HoverBorderColor: =RGBA(0, 18, 107, 1)
+            HoverFill: =RGBA(186, 202, 226, 1)
+            Width: =183
+            X: =187
+            Y: =18
+      - lblSourceSheetID:
+          Control: Label@2.5.1
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Font: =Font.'Open Sans'
+            Text: ="Source Sheet ID"
+            X: =40
+            Y: =18
+      - txtTargetSheetID:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Default: =3560761537286020
+            Font: =Font.'Open Sans'
+            Height: =37
+            HoverBorderColor: =RGBA(0, 18, 107, 1)
+            HoverFill: =RGBA(186, 202, 226, 1)
+            PaddingRight: =2.53
+            PaddingTop: =2.53
+            Width: =184
+            X: =1141
+            Y: =18
+      - lblTargetSheetID:
+          Control: Label@2.5.1
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Font: =Font.'Open Sans'
+            Text: ="Target Sheet ID"
+            X: =954
+            Y: =18
+      - btnMapTargetColumns:
+          Control: Classic/Button@2.2.0
+          Properties:
+            BorderColor: =ColorFade(Self.Fill, -15%)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(166, 166, 166, 1)
+            Fill: =RGBA(56, 96, 178, 1)
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+            HoverColor: =RGBA(255, 255, 255, 1)
+            HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            OnSelect: "=// ====================================================================\n// BUTTON 3: btnMapTargetColumns.OnSelect - FINAL CLEAN VERSION\n// Purpose: Load target sheet + auto-match titles + populate complete target data\n// ====================================================================\n// Validate that cascade structure exists\nIf(\n    CountRows(colComboSelection) = 0,\n    Notify(\n        \"Please setup cascade structure first (Button 2)!\",\n        NotificationType.Warning\n    );\n    Exit()\n);\n// Load target sheet data using Power Automate to get complete column data including options\nSet(\n    varLoadingTargetData,\n    true\n);\nSet(varTargetSheetID,txtTargetSheetID.Text);\nSet(\n    varGetSheet,\n    'PowerApps>GetSmartsheet'.Run(varTargetSheetID).getsheetbody\n);\nSet(\n    varParsedSheetData,\n    ParseJSON(varGetSheet)\n);\nSet(\n    varTargetSheetName,\n    Text(varParsedSheetData.name)\n);\nSet(\n    varTempColumns,\n    Table(varParsedSheetData.columns)\n);\n\n// get colTargetSheetData with  {'columnId':columnId Integar , 'displayValue': displayValue Text} structure\nSet(\n    varTempRows,\n    Table(varParsedSheetData.rows));\n\n// Clear the collection first\nClearCollect(colTargetSheetData, []);\n\n// Flatten with nested ForAll and filtered Collect\nForAll(\n    varTempRows,\n    With(\n        {Cells: ThisRecord.Value.cells},\n        ForAll(\n            Cells,\n            // ✅ Only collect if displayValue is not blank/empty\n            If(\n                Not(IsBlank(ThisRecord.displayValue)) && \n                ThisRecord.displayValue <> \"\" && \n                Len(ThisRecord.displayValue) > 0,\n                \n                Collect(\n                    colTargetSheetData,\n                    {\n                        'columnId': ThisRecord.columnId, \n                        'displayValue': ThisRecord.displayValue\n                    }\n                )\n            )\n        )\n    )\n);\n\nClearCollect(\n    colTargetColumns,\n    ForAll(\n        varTempColumns,\n        {\n            id: Value(Value.id),\n            index: Value(Value.index),\n            title: Text(Value.title),\n            type: Text(Value.type),                     // Keep original type\n            version: Value(Value.version),              // Keep version info\n            \n            // ✅ ADD: Calculate correct targetColumnType based on version\n            targetColumnType: Switch(\n                Value(Value.version),\n                1, \"MULTI_CONTACT_LIST\",                // Version 1 = Multi-contact\n                2, \"MULTI_PICKLIST\",                    // Version 2 = Multi-picklist\n                Text(Value.type)                        // Version 0 = Original type\n            ),\n            \n            options: Table(Value.options),\n            contactOptions: ForAll(\n                Table(Value.contactOptions),\n                {\n                    name: Text(Value.name),\n                    email: Text(Value.email)\n                }\n            )\n        }\n    )\n);\n// replace with patch\n// ✅ SIMPLE: Use Patch to update only targetColumnTitle for auto-matching\n\nForAll(\n    colComboSelection,\n    With(\n        {\n            currentRecord: ThisRecord,           // ✅ Capture the current record\n            sourceTitle: ThisRecord.title        // ✅ Capture source title\n        },\n        With(\n            {\n                targetMatch: First(Filter(colTargetColumns, title = sourceTitle))  // ✅ Use captured sourceTitle\n            },\n            If(\n                Not(IsBlank(targetMatch)),  // Only update if match found\n                Patch(\n                    colComboSelection,\n                    LookUp(colComboSelection, id = currentRecord.id),  // ✅ Use captured currentRecord\n                    {\n                        targetColumnTitle: targetMatch.title,\n                        isTargetMapped: true\n                    }\n                )\n            )\n        )\n    )\n);\n\nSet(\n    varLoadingTargetData,\n    false\n);\n// Show mapping results\nWith(\n    {\n        mappedCount: CountRows(\n            Filter(\n                colComboSelection,\n                isTargetMapped = true\n            )\n        ),\n        totalCount: CountRows(colComboSelection)\n    },\n    Notify(\n        \"Target mapping complete! \" & mappedCount & \" of \" & totalCount & \" columns auto-matched.\",\n        NotificationType.Success\n    )\n);\n// ====================================================================\n// RESULT: \n// - colTargetColumns: Complete target data WITH options (for Stage 2)\n// - colComboSelection: Clean cascade structure with complete target mapping\n// - Auto-matched columns populated with full target metadata\n// ===================================================================="
+            PressedBorderColor: =Self.Fill
+            PressedColor: =Self.Fill
+            PressedFill: =Self.Color
+            Size: =10
+            Text: ="Map Target Columns"
+            Width: =187
+            X: =1138
+            Y: =80
+      - btnSaveStage1AndContinue:
+          Control: Classic/Button@2.2.0
+          Properties:
+            BorderColor: =ColorFade(Self.Fill, -15%)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(166, 166, 166, 1)
+            Fill: =RGBA(56, 96, 178, 1)
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+            HoverColor: =RGBA(255, 255, 255, 1)
+            HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            OnSelect: |-
+              =// ====================================================================
+              // BUTTON 4: btnSaveStage1AndContinue.OnSelect - WITH TARGET ENRICHMENT
+              // ====================================================================
+
+              // 1. VALIDATION
+              If(
+                  CountRows(colComboSelection) = 0,
+                  Notify("Please setup cascade structure first!", NotificationType.Warning);
+                  Exit()
+              );
+
+              If(
+                  CountRows(Filter(colComboSelection, isTargetMapped = true)) = 0,
+                  Notify("Please map at least one target column!", NotificationType.Warning);
+                  Exit()
+              );
+
+              // 2. ENRICH TARGET DATA - Populate complete target information
+
+              ForAll(
+                  Filter(colComboSelection, targetColumnTitle <> ""),  // Only mapped items
+                  With(
+                      {
+                          currentRecord: ThisRecord,
+                          targetTitle: ThisRecord.targetColumnTitle
+                      },
+                      With(
+                          {
+                              targetColumn: LookUp(colTargetColumns, title = targetTitle)
+                          },
+                          If(
+                              Not(IsBlank(targetColumn)),  // Only update if target found
+                              Patch(
+                                  colComboSelection,
+                                  LookUp(colComboSelection, id = currentRecord.id),
+                                  {
+                                      targetColumnId: Text(targetColumn.id),
+                                      targetColumnType: targetColumn.type,
+                                      targetColumnIndex: targetColumn.index,
+                                      allowMultiSelect: targetColumn.type in ["MULTI_PICKLIST", "MULTI_CONTACT_LIST"]
+                                  }
+                              )
+                          )
+                      )
+                  )
+              );
+
+
+              // 3. GENERATE FORM ID
+              If(IsBlank(varFormID), Set(varFormID, GUID()));
+
+              // 4. BUILD JSON CONFIGURATION
+              Set(varFormConfigJSON, JSON({
+                  formMetadata: {
+                      version: "1.1",
+                      stage: "Stage1-Cascade",
+                      created: Text(Now(), "yyyy-mm-ddThh:mm:ssZ"),
+                      lastModified: Text(Now(), "yyyy-mm-ddThh:mm:ssZ")
+                  },
+                  sheetConfiguration: {
+                      cascadeDataSheet: {
+                          id: txtSourceSheetID.Text,
+                          name: varSheetData.name,
+                          type: "CASCADE_SOURCE"
+                      },
+                      targetSheet: {
+                          id: txtTargetSheetID.Text,
+                          name: varTargetSheetName,
+                          type: "SUBMISSION_TARGET"
+                      }
+                  },
+                  cascadeFields: ForAll(
+                      Filter(colComboSelection, isTargetMapped = true),
+                      {
+                          position: position,
+                          sourceColumnId: Text(id),
+                          sourceColumnTitle: title,
+                          sourceColumnType: type,
+                          targetColumnId: targetColumnId,
+                          targetColumnTitle: targetColumnTitle,
+                          targetColumnType: targetColumnType,
+                          targetColumnIndex: targetColumnIndex,
+                          isRequired: true,
+                          allowMultiSelect: allowMultiSelect
+                      }
+                  ),
+                  primaryFields: [],
+                  secondaryFields: []
+              }));
+
+              // 5. SAVE TO SHAREPOINT
+              Patch('Form Definition Admin', 
+                  Defaults('Form Definition Admin'),
+                  {
+                      Title: If(IsBlank(txtFormDisplayName.Text), "Dynamic Form " & Text(Now(), "mm/dd"), txtFormDisplayName.Text),
+                      FormID: varFormID,
+                      FormDisplayName: If(IsBlank(txtFormDisplayName.Text), "Dynamic Form " & Text(Now(), "mm/dd"), txtFormDisplayName.Text),
+                      FormDescription: "Cascade form with " & CountRows(Filter(colComboSelection, isTargetMapped = true)) & " levels",
+                      FormStatus: {Value: "Draft"},
+                      BuilderStage: "Stage1-Cascade",
+                      CascadeDataSheetID: txtSourceSheetID.Text,
+                      TargetSheetID: txtTargetSheetID.Text,
+                      FormConfiguration: varFormConfigJSON,
+                      CascadeCount: CountRows(Filter(colComboSelection, isTargetMapped = true)),
+                      PrimaryCount: 0,
+                      SecondaryCount: 0,
+                      UsesMasterData: false,
+                      UsesReferenceLookup: false,
+                      CreatedDate: Now(),
+                      ModifiedDate: Now()
+                  }
+              );
+
+              // 6. PREPARE NAVIGATION DATA
+              ClearCollect(colUsedTargetColumns,
+                  ForAll(Filter(colComboSelection, isTargetMapped = true),
+                      {
+                          id: targetColumnId,
+                          title: targetColumnTitle,
+                          type: targetColumnType,
+                          sourceTitle: title,
+                          position: position,
+                          usage: "cascade"
+                      }
+                  )
+              );
+
+              ClearCollect(colAvailableColumns,
+                  Filter(colTargetColumns,
+                      Not(Text(id) in colUsedTargetColumns.id)
+                  )
+              );
+
+              // 7. SUCCESS NOTIFICATION AND NAVIGATION
+              With(
+                  {
+                      mappedCount: CountRows(Filter(colComboSelection, isTargetMapped = true)),
+                      availableCount: CountRows(colAvailableColumns)
+                  },
+                  Notify(
+                      "Stage 1 Complete! " & mappedCount & " cascade fields saved. " & availableCount & " columns available for Primary/Secondary.",
+                      NotificationType.Success,
+                      3000
+                  )
+              );
+
+              Navigate('Form Screen');
+              /*
+
+              // 1. VALIDATION
+              If(
+                  CountRows(colComboSelection) = 0,
+                  Notify("Please setup cascade structure first!", NotificationType.Warning);
+                  Exit()
+              );
+
+              If(
+                  CountRows(Filter(colComboSelection, isTargetMapped = true)) = 0,
+                  Notify("Please map at least one target column!", NotificationType.Warning);
+                  Exit()
+              );
+
+              // 2. GENERATE FORM ID
+              If(IsBlank(varFormID), Set(varFormID, GUID()));
+
+              // 3. BUILD JSON CONFIGURATION
+              Set(varFormConfigJSON, JSON({
+                  formMetadata: {
+                      version: "1.1",
+                      stage: "Stage1-Cascade",
+                      created: Text(Now(), "yyyy-mm-ddThh:mm:ssZ"),
+                      lastModified: Text(Now(), "yyyy-mm-ddThh:mm:ssZ")
+                  },
+                  sheetConfiguration: {
+                      cascadeDataSheet: {
+                          id: txtSourceSheetID.Text,
+                          name: varSheetData.name,
+                          type: "CASCADE_SOURCE"
+                      },
+                      targetSheet: {
+                          id: txtTargetSheetID.Text,
+                          name: varTargetSheetName,
+                          type: "SUBMISSION_TARGET"
+                      }
+                  },
+                  cascadeFields: ForAll(
+                      Filter(colComboSelection, isTargetMapped = true),
+                      {
+                          position: position,
+                          sourceColumnId: Text(id),
+                          sourceColumnTitle: title,
+                          sourceColumnType: type,
+                          targetColumnId: targetColumnId,
+                          targetColumnTitle: targetColumnTitle,
+                          targetColumnType: targetColumnType,
+                          targetColumnIndex: targetColumnIndex,
+                          isRequired: true,
+                          allowMultiSelect: allowMultiSelect
+                      }                                    // ✅ FIXED: Added missing closing brace
+                  ),
+                  primaryFields: [],
+                  secondaryFields: []
+              }));
+
+              // 4. SAVE TO SHAREPOINT
+              Patch('Form Definition Admin', 
+                  Defaults('Form Definition Admin'),
+                  {
+                      Title: If(IsBlank(txtFormDisplayName.Text), "Dynamic Form " & Text(Now(), "mm/dd"), txtFormDisplayName.Text),
+                      FormID: varFormID,
+                      FormDisplayName: If(IsBlank(txtFormDisplayName.Text), "Dynamic Form " & Text(Now(), "mm/dd"), txtFormDisplayName.Text),
+                      FormDescription: "Cascade form with " & CountRows(Filter(colComboSelection, isTargetMapped = true)) & " levels",
+                      FormStatus: {Value: "Draft"},
+                      BuilderStage: "Stage1-Cascade",
+                      CascadeDataSheetID: txtSourceSheetID.Text,
+                      TargetSheetID: txtTargetSheetID.Text,
+                      FormConfiguration: varFormConfigJSON,
+                      CascadeCount: CountRows(Filter(colComboSelection, isTargetMapped = true)),
+                      PrimaryCount: 0,
+                      SecondaryCount: 0,
+                      UsesMasterData: false,
+                      UsesReferenceLookup: false,
+                      CreatedDate: Now(),
+                      ModifiedDate: Now()
+                  }
+              );
+
+              // 5. PREPARE NAVIGATION DATA
+              ClearCollect(colUsedTargetColumns,
+                  ForAll(Filter(colComboSelection, isTargetMapped = true),
+                      {
+                          id: targetColumnId,
+                          title: targetColumnTitle,
+                          type: targetColumnType,
+                          sourceTitle: title,
+                          position: position,
+                          usage: "cascade"
+                      }
+                  )
+              );
+
+              ClearCollect(colAvailableColumns,
+                  Filter(colTargetColumns,
+                      Not(Text(id) in colUsedTargetColumns.id)
+                  )
+              );
+
+              // 6. SUCCESS NOTIFICATION AND NAVIGATION
+              With(
+                  {
+                      mappedCount: CountRows(Filter(colComboSelection, isTargetMapped = true)),
+                      availableCount: CountRows(colAvailableColumns)
+                  },
+                  Notify(
+                      "Stage 1 Complete! " & mappedCount & " cascade fields saved. " & availableCount & " columns available for Primary/Secondary.",
+                      NotificationType.Success,
+                      3000
+                  )
+              );
+
+              Navigate('Form Screen');
+
+              */
+            PressedBorderColor: =Self.Fill
+            PressedColor: =Self.Fill
+            PressedFill: =Self.Color
+            Size: =10
+            Text: ="Save & Continue"
+            X: =1165
+            Y: =706
+      - txtFormDisplayName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Default: |+
+              ="Form for :" & varTargetSheetName
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =RGBA(0, 18, 107, 1)
+            HoverFill: =RGBA(186, 202, 226, 1)
+            Width: =435
+            X: =669
+            Y: =706
+      - Button5:
+          Control: Classic/Button@2.2.0
+          Properties:
+            BorderColor: =ColorFade(Self.Fill, -15%)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(166, 166, 166, 1)
+            Fill: =RGBA(56, 96, 178, 1)
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+            HoverColor: =RGBA(255, 255, 255, 1)
+            HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            OnSelect: |-
+              =Navigate(
+                  'Form Screen')
+            PressedBorderColor: =Self.Fill
+            PressedColor: =Self.Fill
+            PressedFill: =Self.Color
+            Size: =12
+            Text: ="Form Screen"
+            X: =40
+            Y: =706
