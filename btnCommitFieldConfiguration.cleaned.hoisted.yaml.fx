@@ -57,13 +57,6 @@ With(
                 "external-source",
                 {
                     // External source specific
-                    hasExternalSource: true,
-                    externalSourceType: "EXTERNAL_SHEET",
-                    externalSheetId: varConfirmedExternalSheetID,
-                    externalSheetName: varConfirmedSheetName,
-                    externalColumnId: Text(varConfirmedExternalColumn.id),
-                    externalColumnTitle: varConfirmedExternalColumn.title,
-                    externalColumnType: varConfirmedExternalColumn.type,
                     optionSourceType: "external-source",
                     optionSourceConfig: {
                         type: "EXTERNAL_SHEET",
@@ -84,8 +77,6 @@ With(
                 "target-combined",
                 {
                     // Target combined specific
-                    hasExternalSource: false,
-                    externalSourceType: "",
                     optionSourceType: "target-combined",
                     optionSourceConfig: {
                         type: "TARGET_COMBINED",
@@ -99,8 +90,6 @@ With(
                 },
                 // COLUMN DEFINITION ONLY configuration (default for "target-column")
                 {
-                    hasExternalSource: false,
-                    externalSourceType: "",
                     optionSourceType: "column-definition",
                     optionSourceConfig: {
                         type: "COLUMN_DEFINITION",
