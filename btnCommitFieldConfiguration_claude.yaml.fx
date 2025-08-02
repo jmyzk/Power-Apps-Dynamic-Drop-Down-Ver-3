@@ -27,30 +27,12 @@ Set(
 // 3. SET SOURCE-SPECIFIC CONFIGURATION VARIABLES
 Set(
     varHasExternalSource,
-    Switch(
-        varOptionsSource,
-        "external-source", true,
-        false
-    )
+    varOptionsSource = "external-source"
 );
 
 Set(
     varExternalSourceType,
-    Switch(
-        varOptionsSource,
-        "external-source", "EXTERNAL_SHEET",
-        ""
-    )
-);
-
-Set(
-    varOptionSourceType,
-    Switch(
-        varOptionsSource,
-        "external-source", "external-source",
-        "target-combined", "target-combined",
-        "column-definition"
-    )
+    If(varOptionsSource = "external-source", "EXTERNAL_SHEET", "")
 );
 
 Set(
@@ -112,6 +94,7 @@ With(
     With(
         {
             finalFieldConfiguration: {
+                // === BASIC/TARGET SHEET PROPERTIES ===
                 fieldId: varCurrentField.fieldId,
                 targetColumnId: varCurrentField.targetColumnId,
                 targetColumnTitle: varCurrentField.targetColumnTitle,
@@ -122,16 +105,25 @@ With(
                 isRequired: varCurrentField.isRequired,
                 allowMultiSelect: varCurrentField.allowMultiSelect,
                 displayOrder: varCurrentField.displayOrder,
-                // Source-specific properties using variables
+                
+                // === OPTION SOURCE PROPERTIES (GENERAL) ===
+                optionSourceType: varOptionsSource,
+                optionSourceConfig: varOptionSourceConfig,
+                
+                // === COLUMN DEFINITION ONLY ===
+                // (No additional properties needed)
+                
+                // === TARGET COMBINED ===
+                // (Properties handled in optionSourceConfig)
+                
+                // === EXTERNAL SHEET PROPERTIES (MOST COMPLEX) ===
                 hasExternalSource: varHasExternalSource,
                 externalSourceType: varExternalSourceType,
                 externalSheetId: If(varOptionsSource = "external-source", varConfirmedExternalSheetID, ""),
                 externalSheetName: If(varOptionsSource = "external-source", varConfirmedSheetName, ""),
                 externalColumnId: If(varOptionsSource = "external-source", Text(varConfirmedExternalColumn.id), ""),
                 externalColumnTitle: If(varOptionsSource = "external-source", varConfirmedExternalColumn.title, ""),
-                externalColumnType: If(varOptionsSource = "external-source", varConfirmedExternalColumn.type, ""),
-                optionSourceType: varOptionSourceType,
-                optionSourceConfig: varOptionSourceConfig
+                externalColumnType: If(varOptionsSource = "external-source", varConfirmedExternalColumn.type, "")
             },
             // ✅ FIXED: Handle empty primaryFields array properly
             currentPrimaryFields: // Table(currentConfig.primaryFields)// Convert to table if exists
@@ -224,14 +216,7 @@ Patch(
     ),
     {
         hasExternalSource: varOptionsSource = "external-source" && varExternalSelectionConfirmed,
-        optionSourceType: Switch(
-            varOptionsSource,
-            "external-source",
-            "external-source",
-            "target-combined",
-            "target-combined",
-            "column-definition"
-        ),
+        optionSourceType: varOptionsSource,
         isConfigured: true,
         configurationComplete: true,
         lastModified: Now()
