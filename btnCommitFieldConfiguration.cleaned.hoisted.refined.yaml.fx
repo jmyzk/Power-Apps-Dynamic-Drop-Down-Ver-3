@@ -1,0 +1,305 @@
+// ====================================================================
+// btnCommitFieldConfiguration.OnSelect - COMMIT FIELD CONFIG TO SHAREPOINT
+// Purpose: Final commit of field configuration based on user's checkbox selection
+// ====================================================================
+// ====================================================================
+// FIXED: btnCommitFieldConfiguration.OnSelect - Handle Empty primaryFields Array
+// Purpose: Final commit of field configuration based on user's checkbox selection
+// ====================================================================
+// 1. VALIDATION
+If(
+    IsBlank(varCurrentFieldColumnId) || IsBlank(varFormID),
+    Notify(
+        "Missing field or form information.",
+        NotificationType.Error
+    );
+    Exit()
+);
+// 2. GET CURRENT FIELD AND SHAREPOINT DATA
+With(
+    {
+        currentField: LookUp(
+            colPrimaryFields,
+            targetColumnId = varCurrentFieldColumnId
+        ),
+        // Get current SharePoint record
+        currentRecord: LookUp(
+            'Form Definition Admin',
+            FormID = Text(varFormID)
+        ),
+        currentConfig: ParseJSON(
+            LookUp(
+                'Form Definition Admin',
+                FormID = Text(varFormID),
+                FormConfiguration
+            )
+        )
+    },
+    // 3. BUILD FIELD CONFIGURATION based on varOptionsSource
+    With(
+        {
+            finalFieldConfiguration: With(
+        {
+            fieldId: currentField.fieldId,
+            targetColumnId: currentField.targetColumnId,
+            targetColumnTitle: currentField.targetColumnTitle,
+            targetColumnType: currentField.targetColumnType,
+            targetColumnIndex: currentField.targetColumnIndex,
+            controlType: currentField.controlType,
+            section: "primary",
+            isRequired: currentField.isRequired,
+            allowMultiSelect: currentField.allowMultiSelect,
+            displayOrder: currentField.displayOrder,,
+            finalFieldConfiguration: Switch(
+                varOptionsSource,
+
+                // EXTERNAL SOURCE configuration
+                "external-source",
+                {
+                    // External source specific
+                    hasExternalSource: true,
+                    externalSourceType: "EXTERNAL_SHEET",
+                    externalSheetId: varConfirmedExternalSheetID,
+                    externalSheetName: varConfirmedSheetName,
+                    externalColumnId: Text(varConfirmedExternalColumn.id),
+                    externalColumnTitle: varConfirmedExternalColumn.title,
+                    externalColumnType: varConfirmedExternalColumn.type,
+                    optionSourceType: "external-source",
+                    optionSourceConfig: {
+                        type: "EXTERNAL_SHEET",
+                        sheetId: varConfirmedExternalSheetID,
+                        sheetName: varConfirmedSheetName,
+                        columnId: varConfirmedExternalColumn.id,
+                        columnTitle: varConfirmedExternalColumn.title,
+                        columnType: varConfirmedExternalColumn.type,
+                        previewCount: CountRows(varPreviewOptions),
+                        configuredDate: Text(
+                            Now(),
+                            "yyyy-mm-ddThh:mm:ssZ"
+                        )
+        }
+                    }
+                },
+                // TARGET COMBINED configuration
+                "target-combined",
+                {
+                    fieldId: currentField.fieldId,
+                    targetColumnId: currentField.targetColumnId,
+                    targetColumnTitle: currentField.targetColumnTitle,
+                    targetColumnType: currentField.targetColumnType,
+                    targetColumnIndex: currentField.targetColumnIndex,
+                    controlType: currentField.controlType,
+                    section: "primary",
+                    isRequired: currentField.isRequired,
+                    allowMultiSelect: currentField.allowMultiSelect,
+                    displayOrder: currentField.displayOrder,
+                    // Target combined specific
+                    hasExternalSource: false,
+                    externalSourceType: "",
+                    optionSourceType: "target-combined",
+                    optionSourceConfig: {
+                        type: "TARGET_COMBINED",
+                        useColumnDefinition: true,
+                        useTargetSheetData: true,
+                        configuredDate: Text(
+                            Now(),
+                            "yyyy-mm-ddThh:mm:ssZ"
+                        )
+                    }
+                },
+                // COLUMN DEFINITION ONLY configuration (default for "target-column")
+                {
+                    fieldId: currentField.fieldId,
+                    targetColumnId: currentField.targetColumnId,
+                    targetColumnTitle: currentField.targetColumnTitle,
+                    targetColumnType: currentField.targetColumnType,
+                    targetColumnIndex: currentField.targetColumnIndex,
+                    controlType: currentField.controlType,
+                    section: "primary",
+                    isRequired: currentField.isRequired,
+                    allowMultiSelect: currentField.allowMultiSelect,
+                    displayOrder: currentField.displayOrder,
+                    // Column definition only specific
+                    hasExternalSource: false,
+                    externalSourceType: "",
+                    optionSourceType: "column-definition",
+                    optionSourceConfig: {
+                        type: "COLUMN_DEFINITION",
+                        useColumnDefinition: true,
+                        configuredDate: Text(
+                            Now(),
+                            "yyyy-mm-ddThh:mm:ssZ"
+                        )
+                    }
+                }
+            ), // Swich
+            // ✅ FIXED: Handle empty primaryFields array properly
+            currentPrimaryFields: // Table(currentConfig.primaryFields)// Convert to table if exists
+            If(
+                IsBlank(currentConfig.primaryFields) || CountRows(Table(currentConfig.primaryFields)) = 0,
+                [],// Empty array if primaryFields is null or empty
+                Table(currentConfig.primaryFields)// Convert to table if exists
+            )
+        },
+        // 4. UPDATE SHAREPOINT JSON CONFIGURATION
+        ClearCollect(colFrimaryField, currentField);
+        Collect(colFrimaryField,finalFieldConfiguration);
+        Set(
+            varUpdatedFormConfigJSON,
+            JSON(
+                {
+                    formMetadata: {
+                        version: "1.2",
+                        stage: Text(currentConfig.formMetadata.stage),
+                        created: Text(currentConfig.formMetadata.created),
+                        lastModified: Text(
+                            Now(),
+                            "yyyy-mm-ddThh:mm:ssZ"
+                        )
+                    },
+                    sheetConfiguration: currentConfig.sheetConfiguration,
+                    cascadeFields: currentConfig.cascadeFields,
+                    // Update primaryFields array
+                    // Simpler: Always append (for single-field commits)
+                    primaryFields: colPrimaryFields, // [finalFieldConfiguration],
+                    /*
+                    
+                    
+                    If(
+                        CountRows(currentPrimaryFields) = 0,
+                        [{name: "Yoko", age: 53}],
+                        [{name: "Juni", age: 70}]),
+        
+        
+                        // [finalFieldConfiguration],
+                        ForAll(
+                            Sequence(CountRows(currentPrimaryFields) + 1),
+                            If(
+                                Value <= CountRows(currentPrimaryFields),
+                                Index(
+                                    currentPrimaryFields,
+                                    Value
+                                ),
+                                [{name: "Yoko", age: 53}],
+                                // finalFieldConfiguration
+                            )
+                        )
+                    ),
+                    */
+
+                    secondaryFields: currentConfig.secondaryFields
+                }
+            )
+        )// End Set and JSON
+    )// End With for section 3
+);
+// End With for section 2
+// 5. UPDATE SHAREPOINT RECORD
+With(
+    {
+        // Count external fields directly from local collection instead of parsing JSON
+        externalFieldsCount: CountRows(
+            Filter(
+                colPrimaryFields,
+                hasExternalSource = true
+            )
+        )
+    },
+    Patch(
+        'Form Definition Admin',
+        LookUp(
+            'Form Definition Admin',
+            FormID = Text(varFormID)
+        ),
+        {
+            FormConfiguration: varUpdatedFormConfigJSON,
+            ModifiedDate: Now(),
+            PrimaryCount: CountRows(colPrimaryFields),
+            UsesExternalOptions: externalFieldsCount > 0,
+            ExternalOptionCount: externalFieldsCount
+                // Simplified: Just store the current external sheet ID if one is being configured
+        }
+    )
+);
+// 6. UPDATE EXTERNAL SHEETS REGISTRY (only if external source selected)
+If(
+    varOptionsSource = "external-source" && varExternalSelectionConfirmed,
+    Patch(
+        'External Option Sheets',
+        LookUp(
+            'External Option Sheets',
+            SheetID = varConfirmedExternalSheetID
+        ),
+        {
+            UsageCount: LookUp(
+                'External Option Sheets',
+                SheetID = varConfirmedExternalSheetID,
+                UsageCount
+            ) + 1,
+            LastSynced: Now()
+        }
+    )
+);
+// 7. UPDATE LOCAL COLLECTION for UI display
+Patch(
+    colPrimaryFields,
+    LookUp(
+        colPrimaryFields,
+        targetColumnId = varCurrentFieldColumnId
+    ),
+    {
+        hasExternalSource: varOptionsSource = "external-source" && varExternalSelectionConfirmed,
+        optionSourceType: Switch(
+            varOptionsSource,
+            "external-source",
+            "external-source",
+            "target-combined",
+            "target-combined",
+            "column-definition"
+        ),
+        isConfigured: true,
+        configurationComplete: true,
+        lastModified: Now()
+    }
+);
+// 8. RESET CONFIGURATION STATE
+Set(
+    varExternalSelectionConfirmed,
+    false
+);
+Set(
+    varCurrentFieldColumnId,
+    ""
+);
+Set(
+    varShowConfigPanel,
+    false
+);
+// 9. SUCCESS NOTIFICATION
+With(
+    {
+        fieldTitle: LookUp(
+            colPrimaryFields,
+            targetColumnId = varCurrentFieldColumnId,
+            targetColumnTitle
+        ),
+        sourceType: Switch(
+            varOptionsSource,
+            "external-source",
+            "External Source (" & varConfirmedSheetName & ")",
+            "target-combined",
+            "Target Sheet + Column Definition",
+            "Column Definition Only"
+        )
+    },
+    Notify(
+        "Field '" & fieldTitle & "' configured with " & sourceType,
+        NotificationType.Success,
+        3000
+    )
+);
+// 10. TRIGGER UI REFRESH
+Set(
+    varGlobalRefresh,
+    !varGlobalRefresh
+);
