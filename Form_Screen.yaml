@@ -1,0 +1,996 @@
+Screens:
+  Form Screen:
+    Properties:
+      LoadingSpinnerColor: =RGBA(56, 96, 178, 1)
+      OnVisible: "=// ====================================================================\r\n// FORM SCREEN - OnVisible\r\n// Purpose: Initialize Stage 2 with cascade configuration + available fields\r\n// ====================================================================\r\n\r\n// 1. LOAD SAVED CONFIGURATION\r\nSet(varSavedConfig, ParseJSON(varFormConfigJSON));\r\nSet(varCascadeFields, Table(varSavedConfig.cascadeFields));\r\nSet(varSheetConfig, varSavedConfig.sheetConfiguration);\r\n\r\n\r\n// 2. INITIALIZE CASCADE FORM STRUCTURE\r\nClearCollect(\r\n    colFormOrder,\r\n    ForAll(\r\n        varCascadeFields,\r\n        {\r\n            fieldId: Text(Value.sourceColumnId),\r\n            fieldTitle: Text(Value.sourceColumnTitle), \r\n            fieldType: Text(Value.sourceColumnType),\r\n            position: Value.position,\r\n            section: \"cascade\",\r\n            controlType: \"cascade-combo\",\r\n            selectedValue: \"\",\r\n            isRequired: true,\r\n            \r\n            // Target mapping info\r\n            targetColumnId: Text(Value.targetColumnId),\r\n            targetColumnTitle: Text(Value.targetColumnTitle),\r\n            targetColumnType: Text(Value.targetColumnType),\r\n            \r\n            // Cascade-specific data\r\n            cascadeOptions: [],  // Will be populated dynamically\r\n            validation: {required: true, errorMessage: \"\"}\r\n        }\r\n    )\r\n);\r\n\r\n// 3. CREATE AVAILABLE FIELDS FOR PRIMARY/SECONDARY SELECTION\r\n// Exclude cascade target columns from available fields\r\nSet(varUsedTargetIds, \r\n    Concat(Filter(varCascadeFields, Text(Value.targetColumnId) <> \"\"), Text(Value.targetColumnId), \",\")\r\n);\r\n\r\n// 4. INITIALIZE PRIMARY/SECONDARY COLLECTIONS ✅ ADD THIS\r\n// back from add new external sheet\r\nIf(Not(varBackFromscnAddExternalSheetAddToRegistry),ClearCollect(colPrimaryFields, []));\r\nClearCollect(colSecondaryFields, []);\r\n\r\n// 5. OPTIONAL: LOAD EXISTING PRIMARY/SECONDARY CONFIG IF RESUMING\r\n// If you want to support editing existing forms, add this section:\r\n/*\r\nIf(\r\n    Not(IsBlank(varSavedConfig.primaryFields)) && CountRows(Table(varSavedConfig.primaryFields)) > 0,\r\n    ClearCollect(colPrimaryFields, Table(varSavedConfig.primaryFields))\r\n);\r\n\r\nIf(\r\n    Not(IsBlank(varSavedConfig.secondaryFields)) && CountRows(Table(varSavedConfig.secondaryFields)) > 0,\r\n    ClearCollect(colSecondaryFields, Table(varSavedConfig.secondaryFields))\r\n);\r\n*/\r\n\r\n\r\n\r\n// ConfigPanel var reset\r\n// back from add new external sheet\r\nIf(varBackFromscnAddExternalSheetAddToRegistry,Set(varShowConfigPanel, true),Set(varShowConfigPanel, false));\r\nIf(varBackFromscnAddExternalSheetAddToRegistry,Set(varShowSheetSourcePanel, true),Set(varShowSheetSourcePanel, false));\r\nIf(Not(varBackFromscnAddExternalSheetAddToRegistry),Set(varSelectedPrimaryField, Blank()));\r\n\r\n// Set(varSelectedPrimaryField, Blank());\r\nClearCollect(colColumnConfiguration, []);\r\n\r\n\r\n// ADD VARIABLES TO FORM SCREEN OnVisible:\r\nSet(varOrgWideSheetID, \"\");\r\nSet(varShowOrgWideModal, false);\r\nClearCollect(colOrgWideColumns, []);\r\n\r\n// temp\r\nClearCollect(colBusinessColumns,[]);\r\n\r\n\r\n// Add to Form Screen OnVisible (initialize all as enabled):\r\nSet(varEnableTargetColumn, true);\r\nSet(varEnableTargetDistinct, true);\r\nSet(varEnableTargetCombined, true);\r\n\r\nSet(varOptionsSource, \"target-combined\"); // Default selection\r\n\r\n// For Premew/Commit feature\r\nSet(varPreviewGenerated, false);\r\nSet(varHasUncommittedChanges, false);\r\nSet(varCommittingChanges, false);\r\nClearCollect(colPreviewOptions, []);\r\n\r\n\r\n// Initialize cache collection\r\nClearCollect(colCachedExternalSheets, [{sheetID: \"new\", sheetName: \"Add New Sheet ID\", displayText: \"Add New Sheet ID\"}]);\r\n\r\n\r\n\r\n\r\n// Load External Sheets Registry (if not already loaded in App OnStart)\r\nIf(\r\n    CountRows(colExternalSheetsRegistry) = 0,\r\n    ClearCollect(\r\n        colExternalSheetsRegistry,\r\n        Filter('External Option Sheets', Status.Value = \"Active\")\r\n    );\r\n    Notify(\r\n        \"✅ External sheets registry loaded: \" & CountRows(colExternalSheetsRegistry) & \" sheets available\",\r\n        NotificationType.Information,\r\n        2000\r\n    )\r\n);"
+    Children:
+      - Button1:
+          Control: Classic/Button@2.2.0
+          Properties:
+            BorderColor: =ColorFade(Self.Fill, -15%)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(166, 166, 166, 1)
+            Fill: =RGBA(56, 96, 178, 1)
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+            HoverColor: =RGBA(255, 255, 255, 1)
+            HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            OnSelect: |-
+              =Navigate(
+                  'Cascade Builder Screen');
+            PressedBorderColor: =Self.Fill
+            PressedColor: =Self.Fill
+            PressedFill: =Self.Color
+            Size: =10
+            Text: ="Cascade Builder Screen"
+            Width: =200
+            X: =64
+            Y: =712
+      - galAvailableFields:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Height: =553
+            Items: |-
+              =// Filter out cascade target columns + already selected primary/secondary
+              Filter(
+                  colTargetColumns,
+                  Not(Text(id) in Split(varUsedTargetIds, ",").Value) &&
+                  Not(Text(id) in colPrimaryFields.targetColumnId) &&
+                  Not(Text(id) in colSecondaryFields.targetColumnId)
+              )
+            Width: =381
+            X: =40
+            Y: =120
+          Children:
+            - btnAddToPrimary:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  BorderColor: =ColorFade(Self.Fill, -15%)
+                  Color: =RGBA(255, 255, 255, 1)
+                  DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                  Fill: =RGBA(56, 96, 178, 1)
+                  Font: =Font.'Open Sans'
+                  Height: =20
+                  HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                  HoverColor: =RGBA(255, 255, 255, 1)
+                  HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                  OnSelect: "=// UPDATED: btnAddToPrimary OnSelect - With External Source Fields\n// Add to Primary Fields Collection with complete structure\nCollect(\n    colPrimaryFields,\n    {\n        fieldId: GUID(),\n        targetColumnId: Text(ThisItem.id),\n        targetColumnTitle: ThisItem.title,\n        targetColumnType: ThisItem.targetColumnType, // ✅ FIXED: Use targetColumnType (not type)\n        targetColumnIndex: ThisItem.index,\n        section: \"primary\",\n        controlType: Switch(\n            ThisItem.targetColumnType, // ✅ CONSISTENT: Use targetColumnType\n            \"TEXT_NUMBER\", \"text-input\",\n            \"PICKLIST\", \"dropdown\",\n            \"MULTI_PICKLIST\", \"multi-dropdown\",\n            \"CONTACT_LIST\", \"contact-single\",\n            \"MULTI_CONTACT_LIST\", \"contact-multi\",\n            \"DATE\", \"date-picker\",\n            \"DATETIME\", \"datetime-picker\",\n            \"ABSTRACT_DATETIME\", \"datetime-picker\",\n            \"CHECKBOX\", \"checkbox\",\n            \"DURATION\", \"duration-input\",\n            \"PREDECESSOR\", \"text-input\",\n            \"text-input\" // Default fallback\n        ),\n        isRequired: false,\n        defaultValue: \"\",\n        validationRules: {},\n        displayOrder: CountRows(colPrimaryFields) + 1,\n        \n        // ✅ EXISTING: Column definition options\n        options: ThisItem.options,\n        contactOptions: ThisItem.contactOptions,\n        allowMultiSelect: ThisItem.targetColumnType in [\"MULTI_PICKLIST\", \"MULTI_CONTACT_LIST\"],\n        \n        // ➕ NEW: External Source Configuration Fields\n        hasExternalSource: false,                    // Boolean - does this field use external sheet?\n        externalSourceType: \"\",                      // \"EXTERNAL_SHEET\" when configured\n        externalSheetIds: [],                        // Array of sheet IDs (for multi-sheet support)\n        externalSheetNames: [],                      // Array of sheet names (for display)\n        externalColumnId: \"\",                        // Selected external column ID\n        externalColumnTitle: \"\",                     // Selected external column title\n        externalColumnType: \"\",                      // Selected external column type\n        \n        // ➕ NEW: Option Source Management\n        optionSourceType: \"column-definition\",      // Default: \"column-definition\", \"target-combined\", \"external-source\"\n        optionSourceConfig: {},                      // Object to store source-specific configuration\n        \n        // ➕ NEW: Configuration Status\n        isConfigured: true,                          // Default true for column-definition source\n        configurationComplete: true,                 // Default true for column-definition source\n        lastModified: Now(),                         // Timestamp for tracking changes\n        \n        // ➕ NEW: UI State Management\n        showOptionsPreview: false,                   // For UI display control\n        previewOptionCount: CountRows(ThisItem.options) + CountRows(ThisItem.contactOptions) // Initial count from column definition\n    }\n);\n\nSet(varEnableTargetColumn, true);\nSet(varEnableTargetCombined, true);\nSet(varEnableExternalSource, true);\n\n// Optional: Show success message\nNotify(\"Added '\" & ThisItem.title & \"' to Primary Fields\", NotificationType.Success, 2000);"
+                  PressedBorderColor: =Self.Fill
+                  PressedColor: =Self.Fill
+                  PressedFill: =Self.Color
+                  Size: =8
+                  Text: ="Primary"
+                  Width: =70
+                  X: =Parent.TemplateWidth - Self.Width - 16
+                  Y: =27
+            - btnAddToSecondary:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  BorderColor: =ColorFade(Self.Fill, -15%)
+                  Color: =RGBA(255, 255, 255, 1)
+                  DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                  Fill: =RGBA(56, 96, 178, 1)
+                  Font: =Font.'Open Sans'
+                  Height: =20
+                  HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                  HoverColor: =RGBA(255, 255, 255, 1)
+                  HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                  OnSelect: "=// SIMPLIFIED btnAddToSecondary OnSelect - Remove unnecessary IF checks\n// Add to Secondary Fields Collection\nCollect(\n    colSecondaryFields,\n    {\n        fieldId: GUID(),\n        targetColumnId: Text(ThisItem.id),\n        targetColumnTitle: ThisItem.title,\n        targetColumnType: ThisItem.type,\n        targetColumnIndex: ThisItem.index,\n        section: \"secondary\",\n        controlType: Switch(\n            ThisItem.type,\n            \"TEXT_NUMBER\", \"text-input\",\n            \"PICKLIST\", \"dropdown\",\n            \"MULTI_PICKLIST\", \"multi-dropdown\", \n            \"CONTACT_LIST\", \"contact-single\",\n            \"MULTI_CONTACT_LIST\", \"contact-multi\",\n            \"DATE\", \"date-picker\",\n            \"DATETIME\", \"datetime-picker\", \n            \"ABSTRACT_DATETIME\", \"datetime-picker\",\n            \"CHECKBOX\", \"checkbox\",\n            \"DURATION\", \"duration-input\",\n            \"PREDECESSOR\", \"text-input\",\n            \"text-input\"  // Default fallback\n        ),\n        isRequired: false,\n        defaultValue: \"\",\n        validationRules: {},\n        displayOrder: CountRows(colSecondaryFields) + 1,\n        \n        // ✅ SIMPLIFIED: Direct assignment (no IF needed)\n        options: ThisItem.options,\n        contactOptions: ThisItem.contactOptions,\n        \n        // Multi-select capability\n        allowMultiSelect: ThisItem.type in [\"MULTI_PICKLIST\", \"MULTI_CONTACT_LIST\"]\n    }\n);\n\n// Optional: Show success message\nNotify(\"Added '\" & ThisItem.title & \"' to Secondary Fields\", NotificationType.Success, 2000);"
+                  PressedBorderColor: =Self.Fill
+                  PressedColor: =Self.Fill
+                  PressedFill: =Self.Color
+                  Size: =8
+                  Text: ="Secondary"
+                  Width: =70
+                  X: =Parent.TemplateWidth - Self.Width - 16
+                  Y: =52
+            - lblAvailableFieldType:
+                Control: Label@2.5.1
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Font: =Font.'Open Sans'
+                  Height: =20
+                  Size: =10
+                  Text: =" (" & ThisItem.targetColumnType & ")"
+                  X: =16
+                  Y: =52
+            - lblAvailableFieldTitle:
+                Control: Label@2.5.1
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Font: =Font.'Open Sans'
+                  FontWeight: =FontWeight.Semibold
+                  Height: =Self.Size * 2
+                  Size: =12
+                  Text: |-
+                    =// ThisItem.title&" ("&Switch(ThisItem.version,1,"MULTI_CONTACT_LIST",2,"MULTI_PICKLIST",0,ThisItem.type,"TEXT_NUMBER")&")"
+
+                    ThisItem.title
+                  Width: =Parent.TemplateWidth *75%
+                  X: =16
+                  Y: =(Parent.TemplateHeight/2) - (Self.Height / 3)
+      - galPrimaryFields:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Height: =553
+            Items: =SortByColumns(colPrimaryFields, "displayOrder")
+            OnSelect: |-
+              =// Click to configure - Set selected field for configuration panel
+              Set(varSelectedPrimaryField, ThisItem);
+              Set(varShowConfigPanel, true);
+
+              // Initialize configuration if not exists
+              If(
+                  IsBlank(LookUp(colColumnConfiguration, Text(columnId) = Text(ThisItem.targetColumnId))),
+                  Collect(colColumnConfiguration, {
+                      columnId: Text(ThisItem.targetColumnId),
+                      columnTitle: ThisItem.targetColumnTitle,
+                      columnType: ThisItem.targetColumnType,
+                      useTargetSheet: false,
+                      useReferenceSheet: false,
+                      referenceSheetId: "",
+                      referenceColumnId: "",
+                      referenceColumnTitle: "",
+                      optionSourceSummary: "Not configured",
+                      lastUpdated: Now()
+                  })
+              );
+
+              // ✅ ADD: Reset panel state when switching fields
+              Set(varUseUpdatedOptions, false);
+              Set(varOptionsSource, "target-combined"); // Default selection
+              ClearCollect(colUpdatedOptions, {});
+
+              // Reset all checkbox states
+              Set(varEnableTargetColumn, true);
+              Set(varEnableTargetDistinct, true);
+              Set(varEnableTargetCombined, true);
+
+
+              // Add this line to both OnSelect events:
+              Set(varCurrentFieldColumnId, ThisItem.targetColumnId);
+            Width: =406
+            X: =Parent.Width/3
+            Y: =120
+          Children:
+            - icnConfigureOptions:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Color: =RGBA(0, 18, 107, 1)
+                  Height: =50
+                  Icon: |
+                    =With(
+                        {
+                            config: LookUp(
+                                colColumnConfiguration,
+                                Text(columnId) = Text(ThisItem.targetColumnId)
+                            )
+                        },
+                        If(
+                            IsBlank(config) || config.optionSourceSummary = "Not configured",
+                            Icon.Settings,// Settings icon - needs configuration
+                            Icon.CheckBadge// Check badge - configured
+                        )
+                    )
+                  OnSelect: |-
+                    =// Click to configure - Set selected field for configuration panel
+                    Set(varSelectedPrimaryField, ThisItem);
+                    Set(varShowConfigPanel, true);
+
+                    // Initialize configuration if not exists
+                    If(
+                        IsBlank(LookUp(colColumnConfiguration, Text(columnId) = Text(ThisItem.targetColumnId))),
+                        Collect(colColumnConfiguration, {
+                            columnId: Text(ThisItem.targetColumnId),
+                            columnTitle: ThisItem.targetColumnTitle,
+                            columnType: ThisItem.targetColumnType,
+                            useTargetSheet: false,
+                            useReferenceSheet: false,
+                            referenceSheetId: "",
+                            referenceColumnId: "",
+                            referenceColumnTitle: "",
+                            optionSourceSummary: "Not configured",
+                            lastUpdated: Now()
+                        })
+                    );
+
+                    // ✅ ADD: Reset panel state when switching fields
+                    Set(varUseUpdatedOptions, false);
+                    Set(varOptionsSource, "target-combined"); // Default selection
+                    ClearCollect(colUpdatedOptions, {});
+
+                    // Reset all checkbox states
+                    Set(varEnableTargetColumn, true);
+                    Set(varEnableTargetDistinct, true);
+                    Set(varEnableTargetCombined, true);
+
+                    // Add this line to both OnSelect events:
+                    Set(varCurrentFieldColumnId, ThisItem.targetColumnId);
+                  PaddingBottom: =10
+                  PaddingLeft: =10
+                  PaddingRight: =10
+                  PaddingTop: =10
+                  Tooltip: ="Click to configure options sources"
+                  Width: =72
+                  X: =16
+                  Y: =(Parent.TemplateHeight / 2) - (Self.Height / 2)
+            - lblPrimaryFieldTitle:
+                Control: Label@2.5.1
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Font: =Font.'Open Sans'
+                  Height: =Self.Size * 1.8
+                  OnSelect: =Select(Parent)
+                  Text: =ThisItem.targetColumnTitle
+                  Width: =Parent.TemplateWidth - 200
+                  X: =103
+                  Y: =(Parent.TemplateHeight - (Self.Size * 1.8 + lblConfigurationStatus.Size * 1.8)) / 2
+            - lblConfigurationStatus:
+                Control: Label@2.5.1
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Font: =Font.'Open Sans'
+                  Height: =Self.Size * 1.8
+                  OnSelect: =Select(Parent)
+                  Size: =8
+                  Text: |-
+                    =With(
+                        {config: LookUp(colColumnConfiguration, Text(columnId) = Text(ThisItem.targetColumnId))},
+                        If(
+                            IsBlank(config),
+                            "Click to configure options →",
+                            "✓ " & config.optionSourceSummary & " →"
+                        )
+                    )
+                  Width: =lblPrimaryFieldTitle.Width
+                  X: =lblPrimaryFieldTitle.X
+                  Y: =lblPrimaryFieldTitle.Y + lblPrimaryFieldTitle.Height
+            - btnRemove:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  AccessibleLabel: =Self.Tooltip
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Color: =RGBA(220, 50, 47, 1)
+                  Fill: =RGBA(0,0,0,0)
+                  Height: =50
+                  Icon: =Icon.Trash
+                  OnSelect: |-
+                    =// Store the item to be removed for reference
+                    Set(varItemToRemove, ThisItem);
+
+                    // Using Sequence for clean numbering
+                    With(
+                        {
+                            filteredItems: SortByColumns(
+                                Filter(
+                                    colPrimaryFields,
+                                    targetColumnId <> varItemToRemove.targetColumnId
+                                ),
+                                "displayOrder"
+                            )
+                        },
+                        ClearCollect(
+                            colPrimaryFields,
+                            ForAll(
+                                Sequence(CountRows(filteredItems)),
+                                Patch(
+                                    Index(filteredItems, Value),
+                                    {displayOrder: Value}
+                                )
+                            )
+                        )
+                    );
+
+                    // Also remove from configuration collection if exists
+                    RemoveIf(
+                        colColumnConfiguration,
+                        Text(columnId) = Text(varItemToRemove.targetColumnId)
+                    );
+
+                    // Show confirmation
+                    Notify(
+                        "Removed '" & varItemToRemove.targetColumnTitle & "' from Primary Fields",
+                        NotificationType.Success,
+                        2000
+                    );
+
+                    // Clear the temp variable
+                    Set(varItemToRemove, Blank());
+                  PaddingBottom: =16
+                  PaddingLeft: =16
+                  PaddingRight: =16
+                  PaddingTop: =16
+                  Tooltip: ="Remove from Primary Fields"
+                  Width: =50
+                  X: =Parent.TemplateWidth - Self.Width - 12
+                  Y: =(Parent.TemplateHeight / 2) - (Self.Height / 2)
+            - Separator1:
+                Control: Rectangle@2.3.0
+                Properties:
+                  BorderColor: =RGBA(255, 255, 255, 1)
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =8
+                  OnSelect: =Select(Parent)
+                  Width: =Parent.TemplateWidth
+                  Y: =Parent.TemplateHeight - Self.Height
+            - Rectangle1:
+                Control: Rectangle@2.3.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  Fill: =RGBA(56, 96, 178, 1)
+                  Height: =Parent.TemplateHeight - Separator1.Height
+                  OnSelect: =Select(Parent)
+                  Visible: =ThisItem.IsSelected
+                  Width: =4
+      - conConfigModalNew:
+          Control: GroupContainer@1.3.0
+          Variant: ManualLayout
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            BorderThickness: =3
+            Fill: =RGBA(248, 248, 248, 1)
+            Height: = Parent.Height * 0.9
+            Visible: |-
+              =// varShowConfigPanel&&!IsBlank(varSelectedPrimaryField)&&galPrimaryFields.Selected.targetColumnType in ["PICKLIST","MULTI_PICKLIST","CONTACT_LIST","MULTI_CONTACT_LIST"]
+              // varShowConfigPanel&&!IsBlank(varSelectedPrimaryField)&&galPrimaryFields.Selected.targetColumnType in ["PICKLIST","MULTI_PICKLIST","CONTACT_LIST","MULTI_CONTACT_LIST"]
+
+              varShowConfigPanel
+            Width: =Parent.Width*40%
+            X: '=galPrimaryFields.X + (galPrimaryFields.Width / 2) '
+            Y: =(Parent.Height - Self.Height) / 2
+          Children:
+            - conFieldConfiguration:
+                Control: GroupContainer@1.3.0
+                Variant: ManualLayout
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  BorderThickness: =2
+                  Fill: =RGBA(248, 248, 248, 1)
+                  Height: =Parent.Height-32
+                  Visible: |-
+                    =// varShowConfigPanel&&!IsBlank(varSelectedPrimaryField)&&galPrimaryFields.Selected.targetColumnType in ["PICKLIST","MULTI_PICKLIST","CONTACT_LIST","MULTI_CONTACT_LIST"]
+
+                    varShowConfigPanel
+                  Width: '= Parent.Width - 32 '
+                  X: =16
+                  Y: =16
+                Children:
+                  - btnCloseConfig:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Color: =RGBA(0, 18, 107, 1)
+                        Height: =25
+                        Icon: =Icon.Cancel
+                        OnSelect: |+
+                          =// ===================================================================
+                          // UPDATED: btnCloseConfig OnSelect - Complete Reset
+                          // ===================================================================
+
+                          // Close the panel
+                          Set(varShowConfigPanel, false);
+
+                          // Reset option source
+                          // Set(varOptionsSource, "none");
+
+                          // Reset enable variables (updated for 3-checkbox structure)
+                          Set(varEnableTargetColumn, true);
+                          Set(varEnableTargetCombined, true);
+                          Set(varEnableExternalSource, true);
+
+                          // Reset checkboxes (updated for 3-checkbox structure)
+                          Reset(chkTargetColumn);
+                          Reset(chkTargetCombined);
+                          Reset(chkExternalSource);
+
+                          // ✅ NEW: Reset preview-related variables
+                          Set(varPreviewGenerated, false);
+                          Set(varHasUncommittedChanges, false);
+                          Set(varCommittingChanges, false);
+                          Set(varPreviewOptions, Table());
+
+                          // Reset Power Automate related variables
+                          Set(varUseUpdatedOptions, false);
+                          ClearCollect(colUpdatedOptions, {});
+
+                          // ✅ NEW: Reset external source variables (for future implementation)
+                          Set(varShowSheetSourcePanel, false);
+
+                          // ✅ NEW: Clear temporary collections
+                          ClearCollect(col1_ColumnOptions, []);
+                          ClearCollect(col2_SheetData, []);
+                          ClearCollect(colTempCombined, []);
+                          ClearCollect(colTempSplitValues, []);
+
+                        Width: =25
+                        X: |-
+                          =conFieldConfiguration.X+conFieldConfiguration.Width
+                          -60
+                        Y: =16
+                  - lblConfigTitle:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =30
+                        Text: |-
+                          ="Options Config: " & varSelectedPrimaryField.targetColumnTitle
+                        Width: |+
+                          =chkTargetColumn.Width-16
+                        X: =16
+                        Y: =17
+                  - lblFieldType:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =20
+                        Text: |-
+                          ="Field Type: " & varSelectedPrimaryField.targetColumnType
+                        Width: =chkTargetColumn.Width-16
+                        X: =16
+                        Y: =lblConfigTitle.Y+lblConfigTitle.Height + 12
+                  - ddlPreviewColumn:
+                      Control: Classic/DropDown@2.3.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        ChevronBackground: =RGBA(56, 96, 178, 1)
+                        ChevronFill: =RGBA(255, 255, 255, 1)
+                        ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                        Default: =""""""
+                        Font: =Font.'Open Sans'
+                        FontWeight: =FontWeight.Lighter
+                        Height: =43
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Items: "=// ===================================================================\n// SIMPLIFIED: ddlPreviewColumn WITHOUT Source Field\n// ===================================================================\n\nSwitch(\n    varOptionsSource,\n    \"target-column\",\n    // Target column definition only\n    Switch(\n        varSelectedPrimaryField.targetColumnType,\n        \"PICKLIST\", \n        ForAll(varSelectedPrimaryField.options, {Value: Text(ThisRecord.Value)}),\n        \"MULTI_PICKLIST\", \n        ForAll(varSelectedPrimaryField.options, {Value: Text(ThisRecord.Value)}),\n        \"CONTACT_LIST\", \n        ForAll(varSelectedPrimaryField.contactOptions, {Value: Text(ThisRecord.name)}),\n        \"MULTI_CONTACT_LIST\", \n        ForAll(varSelectedPrimaryField.contactOptions, {Value: Text(ThisRecord.name)}),\n        Table({Value: \"No predefined options\"})\n    ),\n    \n    \"target-combined\",\n    // ✅ CORRECTED: chkTargetCombined sets varOptionsSource to \"target-combined\"\n    If(\n        Not(IsBlank(varPreviewOptions)) && CountRows(varPreviewOptions) > 0,\n        varPreviewOptions,\n        Table({Value: \"Generating combined preview...\"})\n    ),\n    \n    \"external-source\", \n    // ✅ CORRECTED: chkExternalSource sets varOptionsSource to \"external-source\"\n       If(\n            varShowSheetSourcePanel,\n            Table({Value: \"Sheet source panel is open - select a source\"}),\n            If(\n                Not(IsBlank(varPreviewOptions)) && CountRows(varPreviewOptions) > 0,\n                varPreviewOptions,\n                Table({Value: \"Click to select external sheet source\"})\n            )\n        ),\n    \n    // Default\n    Table({Value: \"Select an option source above\"})\n)\n\n\n"
+                        Items.Value: =Value
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 18, 107, 1)
+                        SelectionColor: =RGBA(255, 255, 255, 1)
+                        SelectionFill: =RGBA(56, 96, 178, 1)
+                        Width: =(Parent.Width-32)/2
+                        X: =16
+                        Y: =314
+                  - chkExternalSource:
+                      Control: Classic/CheckBox@2.1.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        CheckboxBorderColor: =RGBA(0, 18, 107, 1)
+                        CheckmarkFill: =RGBA(0, 0, 0, 1)
+                        DisplayMode: |-
+                          =// If(varEnableTargetCombined, DisplayMode.Edit, DisplayMode.View)
+                          If(varEnableExternalSource, DisplayMode.Edit, DisplayMode.View)
+                        Font: =Font.'Open Sans'
+                        Height: =40
+                        HoverColor: =RGBA(0, 18, 107, 1)
+                        OnCheck: |
+                          =
+                          // ===================================================================
+                          // UPDATED: chkExternalSource OnCheck - 3-Checkbox Structure
+                          // ===================================================================
+
+                          // chkExternalSource OnCheck:
+                          Set(varOptionsSource, "external-source");
+                          Set(varEnableTargetColumn, false);
+                          Set(varEnableTargetCombined, false);
+                          Set(varEnableExternalSource, true);
+
+                          // ✅ NEW: Set preview state for external source
+                          Set(varPreviewGenerated, true);
+                          Set(varHasUncommittedChanges, true); // External source will need commit
+
+                          // ✅ NEW: Open Sheet Source Selector Panel (future implementation)
+                          Set(varShowSheetSourcePanel, true);
+
+                          // ✅ NEW: Set placeholder preview options
+                          Set(
+                              varPreviewOptions,
+                              Table({Value: "Select external sheet source to generate preview"})
+                          );
+
+                          // To remove previous collections
+                          ClearCollect(
+                              colExternalColumns,{});
+
+                          Set(varShowExternalConfig,false);
+
+                          Set(varCurrentFieldColumnId, varSelectedPrimaryField.targetColumnId); // or your unique ID
+                          Set(varShowExternalModal, true);
+                        OnUncheck: |+
+                          =// ===================================================================
+                          // UPDATED: chkExternalSource OnUncheck - 3-Checkbox Structure  
+                          // ===================================================================
+
+                          // chkExternalSource OnUncheck:
+                          // Set(varOptionsSource, "none");
+
+                          Set(varEnableTargetColumn, true );
+                          Set(varEnableTargetCombined, true );
+                          Set(varEnableExternalSource, true );
+
+
+                          // ✅ NEW: Reset preview state
+                          Set(varPreviewGenerated, false);
+                          Set(varHasUncommittedChanges, false);
+
+                          // ✅ NEW: Close Sheet Source Selector Panel
+                          Set(varShowSheetSourcePanel, false);
+
+                          // ✅ NEW: Clear preview options
+                          Set(varPreviewOptions, Table());
+
+                        Text: ="From External Sheet Source"
+                        Width: |+
+                          =chkTargetColumn.Width
+                        X: =chkTargetColumn.X
+                        Y: =chkTargetCombined.Y+chkTargetCombined.Height+6
+                  - chkTargetCombined:
+                      Control: Classic/CheckBox@2.1.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        CheckboxBorderColor: =RGBA(0, 18, 107, 1)
+                        CheckmarkFill: =RGBA(0, 0, 0, 1)
+                        DisplayMode: |-
+                          =// If(varEnableTargetDistinct, DisplayMode.Edit, DisplayMode.View)
+
+                          If(varEnableTargetCombined, DisplayMode.Edit, DisplayMode.View)
+                        Font: =Font.'Open Sans'
+                        Height: =40
+                        HoverColor: =RGBA(0, 18, 107, 1)
+                        OnCheck: "=\r\n// ===================================================================\r\n// CORRECTED: chkTargetCombined OnCheck with Flattened colTargetSheetData\r\n// Using: colTargetSheetData = [{columnId: Integer, displayValue: Text}]\r\n// ===================================================================\r\n\r\n// chkTargetCombined OnCheck:\r\nSet(varOptionsSource, \"target-combined\");\r\nSet(varEnableTargetColumn, false);\r\nSet(varEnableTargetCombined, true);\r\nSet(varEnableExternalSource, false);\r\n\r\n// ✅ Generate immediate preview using flattened colTargetSheetData\r\nSet(varPreviewGenerated, true);\r\n\r\nSwitch(\r\n    varSelectedPrimaryField.targetColumnType,\r\n    \"PICKLIST\",\r\n    // Step 1: Get column definition options\r\n    ClearCollect(\r\n        col1_ColumnOptions,\r\n        ForAll(\r\n            varSelectedPrimaryField.options,\r\n            {\r\n                Value: Text(ThisRecord.Value)\r\n            }\r\n        )\r\n    );\r\n    \r\n    // Step 2: Get target sheet data\r\n    ClearCollect(\r\n        col2_SheetData,\r\n        ForAll(\r\n            Filter(\r\n                colTargetSheetData,\r\n                columnId = varSelectedPrimaryField.targetColumnId\r\n            ),\r\n            {\r\n                Value: Text(displayValue)\r\n            }\r\n        )\r\n    );\r\n    \r\n    // Step 3: Combine collections\r\n    ClearCollect(colTempCombined, []);\r\n    Collect(colTempCombined, col1_ColumnOptions);\r\n    Collect(colTempCombined, col2_SheetData);\r\n    \r\n    // Step 4: Get final distinct values\r\n    Set(\r\n        varPreviewOptions,\r\n        Sort(Distinct(colTempCombined, Value),Value)\r\n    ),\r\n    \r\n    \"MULTI_PICKLIST\",\r\n    // Step 1: Get column definition options\r\n    ClearCollect(\r\n        col1_ColumnOptions,\r\n        ForAll(\r\n            varSelectedPrimaryField.options,\r\n            {\r\n                Value: Text(ThisRecord.Value)\r\n            }\r\n        )\r\n    );\r\n    \r\n    // Step 2: Get and split target sheet multi-picklist data\r\n    With(\r\n        {\r\n            columnValues: Filter(\r\n                colTargetSheetData,\r\n                columnId = varSelectedPrimaryField.targetColumnId\r\n            )\r\n        },\r\n        // Create temporary collection with split values\r\n        ClearCollect(colTempSplitValues, []);\r\n        \r\n        // Split each comma-separated value and collect individually\r\n        ForAll(\r\n            columnValues,\r\n            ForAll(\r\n                Split(displayValue, \",\"),\r\n                Collect(\r\n                    colTempSplitValues,\r\n                    {Value: Trim(Value)}\r\n                )\r\n            )\r\n        );\r\n        \r\n        // Get split values as col2_SheetData\r\n        ClearCollect(\r\n            col2_SheetData,\r\n            colTempSplitValues\r\n        )\r\n    );\r\n    \r\n    // Step 3: Combine collections\r\n    ClearCollect(colTempCombined, []);\r\n    Collect(colTempCombined, col1_ColumnOptions);\r\n    Collect(colTempCombined, col2_SheetData);\r\n    \r\n    // Step 4: Get final distinct values\r\n    Set(\r\n        varPreviewOptions,\r\n        Sort(Distinct(colTempCombined, Value),Value)\r\n    ),\r\n    \r\n    \"CONTACT_LIST\",\r\n    // Step 1: Get column contact options\r\n    ClearCollect(\r\n        col1_ColumnOptions,\r\n        ForAll(\r\n            varSelectedPrimaryField.contactOptions,\r\n            {\r\n                Value: Text(ThisRecord.name)\r\n            }\r\n        )\r\n    );\r\n    \r\n    // Step 2: Get target sheet contact data\r\n    ClearCollect(\r\n        col2_SheetData,\r\n        ForAll(\r\n            Filter(\r\n                colTargetSheetData,\r\n                columnId = varSelectedPrimaryField.targetColumnId\r\n            ),\r\n            {\r\n                Value: Text(displayValue)\r\n            }\r\n        )\r\n    );\r\n    \r\n    // Step 3: Combine collections\r\n    ClearCollect(colTempCombined, []);\r\n    Collect(colTempCombined, col1_ColumnOptions);\r\n    Collect(colTempCombined, col2_SheetData);\r\n    \r\n    // Step 4: Get final distinct values\r\n    Set(\r\n        varPreviewOptions,\r\n        Sort(Distinct(colTempCombined, Value),Value)\r\n    ),\r\n    \r\n    // Default case\r\n    Set(\r\n        varPreviewOptions,\r\n        Table({Value: \"Preview not available for this field type\"})\r\n    )\r\n);\r\n\r\n// Set flag for commit button\r\nSet(varHasUncommittedChanges, true);"
+                        OnUncheck: |+
+                          =// ===================================================================
+                          // chkTargetCombined OnUncheck:
+                          // ===================================================================
+
+                          // Set(varOptionsSource, "none");
+
+                          Set(varEnableTargetColumn, true );
+                          Set(varEnableTargetCombined, true );
+                          Set(varEnableExternalSource, true );
+
+                          Set(varPreviewGenerated, false);
+                          Set(varHasUncommittedChanges, false);
+                          ClearCollect(colPreviewOptions, []);
+                        Text: ="Column Definition + Sheet Data (Recommended)"
+                        Width: |+
+                          =chkTargetColumn.Width
+                        X: =chkTargetColumn.X
+                        Y: =chkTargetColumn.Y+chkTargetColumn.Height+6
+                  - chkTargetColumn:
+                      Control: Classic/CheckBox@2.1.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        CheckboxBorderColor: =RGBA(0, 18, 107, 1)
+                        CheckmarkFill: =RGBA(0, 0, 0, 1)
+                        DisplayMode: |-
+                          =// If(varEnableTargetColumn,DisplayMode.Edit,DisplayMode.View)
+                          If(varEnableTargetColumn, DisplayMode.Edit, DisplayMode.View)
+                        Font: =Font.'Open Sans'
+                        Height: =40
+                        HoverColor: =RGBA(0, 18, 107, 1)
+                        OnCheck: |-
+                          =// When this is checked, disable all others
+                          Set(varOptionsSource,"target-column");
+                          Set(varEnableTargetColumn, true );
+                          Set(varEnableTargetCombined, false );
+                          Set(varEnableExternalSource, false );
+                        OnUncheck: |+
+                          =// Set(varOptionsSource,"none");
+
+                          Set(varEnableTargetColumn, true );
+                          Set(varEnableTargetCombined, true );
+                          Set(varEnableExternalSource, true );
+
+                        Text: ="Column Definition Only"
+                        Width: =Parent.Width*90%
+                        X: =16
+                        Y: =96
+                  - lblOptionsPreview:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        FontWeight: =FontWeight.Bold
+                        Height: =36
+                        Text: ="Options Preview"
+                        Width: =290
+                        X: =16
+                        Y: =265
+                  - btnUpdateFromTargetData:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =43
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: "=/*\nSet(\n    varUpdatingFromTarget,\n    true\n);\nWith(\n    {\n        updateResult: 'UpdateColumnFromTargetData_ver2'.Run(\n            varTargetSheetID,                               // We already have this\n            varSelectedPrimaryField.targetColumnId,         // We know the column\n            varSelectedPrimaryField.targetColumnType,       // Handle contacts vs. picklists\n            varSelectedPrimaryField.targetColumnIndex\n        )\n    },\n    Set(\n        varStatus,\n        updateResult.statuscode\n    );\n    Set(\n        varMessage,\n        updateResult.message\n    );\n    Set(\n        varOptions,\n        updateResult.options\n    );\n    If(\n        varStatus = 200,\n        // Success case\n        Notify(\n            \"✅ Column updated successfully! \" & varMessage,\n            NotificationType.Success\n        );\n        Notify(\n            \"New options: \" & varOptions,\n            NotificationType.Information\n        );\n        // RefreshColumnOptions(),  // Reload to show new options\n        ,\n        // Error case\n        Notify(\n            \"❌ Update failed: \" & varMessage,\n            NotificationType.Error\n        )\n    );\n    Set(\n        varUpdatingFromTarget,\n        false\n    )\n);\n\n*/\n\n// STEP 1: Modify btnUpdateFromTargetData OnSelect to create collection\nSet(\n    varUpdatingFromTarget,\n    true\n);\nWith(\n    {\n        updateResult: 'UpdateColumnFromTargetData_ver2'.Run(\n            varTargetSheetID,\n            varSelectedPrimaryField.targetColumnId,\n            varSelectedPrimaryField.targetColumnType,\n            varSelectedPrimaryField.targetColumnIndex\n        )\n    },\n    Set(\n        varStatus,\n        updateResult.statuscode\n    );\n    Set(\n        varMessage,\n        updateResult.message\n    );\n    Set(\n        varOptions,\n        updateResult.options\n    );\n    \n    // ✅ NEW: Create collection from Power Automate response\n    If(\n        varStatus = 200,\n        // Success - create collection from the response\n        ClearCollect(\n            colUpdatedOptions,\n            // Parse the options based on field type\n            Switch(\n                varSelectedPrimaryField.targetColumnType,\n                \"PICKLIST\",\n                ForAll(\n                    Split(varOptions, \", \"),  // Comma-space separated\n                    {\n                        Value: ThisRecord.Value,\n                        Source: \"Updated from Target Data\"\n                    }\n                ),\n                \"MULTI_PICKLIST\",\n                ForAll(\n                    Split(varOptions, \", \"),  // Comma-space separated\n                    {\n                        Value: ThisRecord.Value,\n                        Source: \"Updated from Target Data\"\n                    }\n                ),\n                \"CONTACT_LIST\",\n                // Extract names from \"name <email@company.com>\" format using Split method\n                ForAll(\n                    Split(varOptions, \", \"),\n                    With(\n                        {\n                            nameOnly: If(\n                                Find(\"<\", ThisRecord.Value) > 0,\n                                First(Split(ThisRecord.Value, \"<\")).Value,\n                                ThisRecord.Value\n                            )\n                        },\n                        {\n                            Value: nameOnly,\n                            Source: \"Updated from Target Data\"\n                        }\n                    )\n                ),\n                \"MULTI_CONTACT_LIST\",\n                // Extract names from \"name <email@company.com>\" format using Split method\n                ForAll(\n                    Split(varOptions, \", \"),\n                    With(\n                        {\n                            nameOnly: If(\n                                Find(\"<\", ThisRecord.Value) > 0,\n                                First(Split(ThisRecord.Value, \"<\")).Value,\n                                ThisRecord.Value\n                            )\n                        },\n                        {\n                            Value: nameOnly,\n                            Source: \"Updated from Target Data\"\n                        }\n                    )\n                ),\n                // Default case\n                Table(\n                    {\n                        Value: varOptions,\n                        Source: \"Updated from Target Data\"\n                    }\n                )\n            )\n        );\n        \n        // Set flag to use updated options\n        Set(varUseUpdatedOptions, true);\n        \n        Notify(\n            \"✅ Column updated successfully! \" & varMessage,\n            NotificationType.Success\n        );\n        Notify(\n            \"New options: \" & varOptions,\n            NotificationType.Information\n        ),\n        \n        // Error case\n        Set(varUseUpdatedOptions, false);\n        Notify(\n            \"❌ Update failed: \" & varMessage,\n            NotificationType.Error\n        )\n    );\n    Set(\n        varUpdatingFromTarget,\n        false\n    )\n);"
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Update Options by Target Column Data"
+                        Visible: |-
+                          =// If(varSelectedPrimaryField.targetColumnType in ["PICKLIST","MULTI_PICKLIST","CONTACT_LIST"], true , false )
+                          false
+                        Width: =196
+                        X: =61
+                        Y: =576
+                  - btnCommitFieldConfiguration:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: "=\r\n\r\n// ====================================================================\r\n// btnCommitFieldConfiguration.OnSelect - COMMIT FIELD CONFIG TO SHAREPOINT\r\n// Purpose: Final commit of field configuration based on user's checkbox selection\r\n// ====================================================================\r\n// ====================================================================\r\n// FIXED: btnCommitFieldConfiguration.OnSelect - Handle Empty primaryFields Array\r\n// Purpose: Final commit of field configuration based on user's checkbox selection\r\n// ====================================================================\r\n// 1. VALIDATION\r\nIf(\r\n    IsBlank(varCurrentFieldColumnId) || IsBlank(varFormID),\r\n    Notify(\r\n        \"Missing field or form information.\",\r\n        NotificationType.Error\r\n    );\r\n    Exit()\r\n);\r\n// 2. GET CURRENT FIELD AND SHAREPOINT DATA\r\nWith(\r\n    {\r\n        currentField: LookUp(\r\n            colPrimaryFields,\r\n            targetColumnId = varCurrentFieldColumnId\r\n        ),\r\n        // Get current SharePoint record\r\n        currentRecord: LookUp(\r\n            'Form Definition Admin',\r\n            FormID = Text(varFormID)\r\n        ),\r\n        currentConfig: ParseJSON(\r\n            LookUp(\r\n                'Form Definition Admin',\r\n                FormID = Text(varFormID),\r\n                FormConfiguration\r\n            )\r\n        )\r\n    },\r\n    // 3. BUILD FIELD CONFIGURATION based on varOptionsSource\r\n    With(\r\n        {\r\n            finalFieldConfiguration: Switch(\r\n                varOptionsSource,\r\n                // EXTERNAL SOURCE configuration\r\n                \"external-source\",\r\n                {\r\n                    fieldId: currentField.fieldId,\r\n                    targetColumnId: currentField.targetColumnId,\r\n                    targetColumnTitle: currentField.targetColumnTitle,\r\n                    targetColumnType: currentField.targetColumnType,\r\n                    targetColumnIndex: currentField.targetColumnIndex,\r\n                    controlType: currentField.controlType,\r\n                    section: \"primary\",\r\n                    isRequired: currentField.isRequired,\r\n                    allowMultiSelect: currentField.allowMultiSelect,\r\n                    displayOrder: currentField.displayOrder,\r\n                    // External source specific\r\n                    hasExternalSource: true,\r\n                    externalSourceType: \"EXTERNAL_SHEET\",\r\n                    externalSheetId: varConfirmedExternalSheetID,\r\n                    externalSheetName: varConfirmedSheetName,\r\n                    externalColumnId: Text(varConfirmedExternalColumn.id),\r\n                    externalColumnTitle: varConfirmedExternalColumn.title,\r\n                    externalColumnType: varConfirmedExternalColumn.type,\r\n                    optionSourceType: \"external-source\",\r\n                    optionSourceConfig: {\r\n                        type: \"EXTERNAL_SHEET\",\r\n                        sheetId: varConfirmedExternalSheetID,\r\n                        sheetName: varConfirmedSheetName,\r\n                        columnId: varConfirmedExternalColumn.id,\r\n                        columnTitle: varConfirmedExternalColumn.title,\r\n                        columnType: varConfirmedExternalColumn.type,\r\n                        previewCount: CountRows(varPreviewOptions),\r\n                        configuredDate: Text(\r\n                            Now(),\r\n                            \"yyyy-mm-ddThh:mm:ssZ\"\r\n                        )\r\n                    }\r\n                },\r\n                // TARGET COMBINED configuration\r\n                \"target-combined\",\r\n                {\r\n                    fieldId: currentField.fieldId,\r\n                    targetColumnId: currentField.targetColumnId,\r\n                    targetColumnTitle: currentField.targetColumnTitle,\r\n                    targetColumnType: currentField.targetColumnType,\r\n                    targetColumnIndex: currentField.targetColumnIndex,\r\n                    controlType: currentField.controlType,\r\n                    section: \"primary\",\r\n                    isRequired: currentField.isRequired,\r\n                    allowMultiSelect: currentField.allowMultiSelect,\r\n                    displayOrder: currentField.displayOrder,\r\n                    // Target combined specific\r\n                    hasExternalSource: false,\r\n                    externalSourceType: \"\",\r\n                    optionSourceType: \"target-combined\",\r\n                    optionSourceConfig: {\r\n                        type: \"TARGET_COMBINED\",\r\n                        useColumnDefinition: true,\r\n                        useTargetSheetData: true,\r\n                        configuredDate: Text(\r\n                            Now(),\r\n                            \"yyyy-mm-ddThh:mm:ssZ\"\r\n                        )\r\n                    }\r\n                },\r\n                // COLUMN DEFINITION ONLY configuration (default for \"target-column\")\r\n                {\r\n                    fieldId: currentField.fieldId,\r\n                    targetColumnId: currentField.targetColumnId,\r\n                    targetColumnTitle: currentField.targetColumnTitle,\r\n                    targetColumnType: currentField.targetColumnType,\r\n                    targetColumnIndex: currentField.targetColumnIndex,\r\n                    controlType: currentField.controlType,\r\n                    section: \"primary\",\r\n                    isRequired: currentField.isRequired,\r\n                    allowMultiSelect: currentField.allowMultiSelect,\r\n                    displayOrder: currentField.displayOrder,\r\n                    // Column definition only specific\r\n                    hasExternalSource: false,\r\n                    externalSourceType: \"\",\r\n                    optionSourceType: \"column-definition\",\r\n                    optionSourceConfig: {\r\n                        type: \"COLUMN_DEFINITION\",\r\n                        useColumnDefinition: true,\r\n                        configuredDate: Text(\r\n                            Now(),\r\n                            \"yyyy-mm-ddThh:mm:ssZ\"\r\n                        )\r\n                    }\r\n                }\r\n            ), // Swich\r\n            // ✅ FIXED: Handle empty primaryFields array properly\r\n            currentPrimaryFields: // Table(currentConfig.primaryFields)// Convert to table if exists\r\n            If(\r\n                IsBlank(currentConfig.primaryFields) || CountRows(Table(currentConfig.primaryFields)) = 0,\r\n                [],// Empty array if primaryFields is null or empty\r\n                Table(currentConfig.primaryFields)// Convert to table if exists\r\n            )\r\n        },\r\n        // 4. UPDATE SHAREPOINT JSON CONFIGURATION\r\n        ClearCollect(colFrimaryField, currentField);\r\n        Collect(colFrimaryField,finalFieldConfiguration);\r\n        Set(\r\n            varUpdatedFormConfigJSON,\r\n            JSON(\r\n                {\r\n                    formMetadata: {\r\n                        version: \"1.2\",\r\n                        stage: Text(currentConfig.formMetadata.stage),\r\n                        created: Text(currentConfig.formMetadata.created),\r\n                        lastModified: Text(\r\n                            Now(),\r\n                            \"yyyy-mm-ddThh:mm:ssZ\"\r\n                        )\r\n                    },\r\n                    sheetConfiguration: currentConfig.sheetConfiguration,\r\n                    cascadeFields: currentConfig.cascadeFields,\r\n                    // Update primaryFields array\r\n                    // Simpler: Always append (for single-field commits)\r\n                    primaryFields: colPrimaryFields, // [finalFieldConfiguration],\r\n\r\n\r\n                    secondaryFields: currentConfig.secondaryFields\r\n                }\r\n            )\r\n        )// End Set and JSON\r\n    )// End With for section 3\r\n);\r\n// End With for section 2\r\n// 5. UPDATE SHAREPOINT RECORD\r\nWith(\r\n    {\r\n        // Count external fields directly from local collection instead of parsing JSON\r\n        externalFieldsCount: CountRows(\r\n            Filter(\r\n                colPrimaryFields,\r\n                hasExternalSource = true\r\n            )\r\n        )\r\n    },\r\n    Patch(\r\n        'Form Definition Admin',\r\n        LookUp(\r\n            'Form Definition Admin',\r\n            FormID = Text(varFormID)\r\n        ),\r\n        {\r\n            FormConfiguration: varUpdatedFormConfigJSON,\r\n            ModifiedDate: Now(),\r\n            PrimaryCount: CountRows(colPrimaryFields),\r\n            UsesExternalOptions: externalFieldsCount > 0,\r\n            ExternalOptionCount: externalFieldsCount\r\n                // Simplified: Just store the current external sheet ID if one is being configured\r\n        }\r\n    )\r\n);\r\n// 6. UPDATE EXTERNAL SHEETS REGISTRY (only if external source selected)\r\nIf(\r\n    varOptionsSource = \"external-source\" && varExternalSelectionConfirmed,\r\n    Patch(\r\n        'External Option Sheets',\r\n        LookUp(\r\n            'External Option Sheets',\r\n            SheetID = varConfirmedExternalSheetID\r\n        ),\r\n        {\r\n            UsageCount: LookUp(\r\n                'External Option Sheets',\r\n                SheetID = varConfirmedExternalSheetID,\r\n                UsageCount\r\n            ) + 1,\r\n            LastSynced: Now()\r\n        }\r\n    )\r\n);\r\n// 7. UPDATE LOCAL COLLECTION for UI display\r\nPatch(\r\n    colPrimaryFields,\r\n    LookUp(\r\n        colPrimaryFields,\r\n        targetColumnId = varCurrentFieldColumnId\r\n    ),\r\n    {\r\n        hasExternalSource: varOptionsSource = \"external-source\" && varExternalSelectionConfirmed,\r\n        optionSourceType: Switch(\r\n            varOptionsSource,\r\n            \"external-source\",\r\n            \"external-source\",\r\n            \"target-combined\",\r\n            \"target-combined\",\r\n            \"column-definition\"\r\n        ),\r\n        isConfigured: true,\r\n        configurationComplete: true,\r\n        lastModified: Now()\r\n    }\r\n);\r\n// 8. RESET CONFIGURATION STATE\r\nSet(\r\n    varExternalSelectionConfirmed,\r\n    false\r\n);\r\nSet(\r\n    varCurrentFieldColumnId,\r\n    \"\"\r\n);\r\nSet(\r\n    varShowConfigPanel,\r\n    false\r\n);\r\n// 9. SUCCESS NOTIFICATION\r\nWith(\r\n    {\r\n        fieldTitle: LookUp(\r\n            colPrimaryFields,\r\n            targetColumnId = varCurrentFieldColumnId,\r\n            targetColumnTitle\r\n        ),\r\n        sourceType: Switch(\r\n            varOptionsSource,\r\n            \"external-source\",\r\n            \"External Source (\" & varConfirmedSheetName & \")\",\r\n            \"target-combined\",\r\n            \"Target Sheet + Column Definition\",\r\n            \"Column Definition Only\"\r\n        )\r\n    },\r\n    Notify(\r\n        \"Field '\" & fieldTitle & \"' configured with \" & sourceType,\r\n        NotificationType.Success,\r\n        3000\r\n    )\r\n);\r\n// 10. TRIGGER UI REFRESH\r\nSet(\r\n    varGlobalRefresh,\r\n    !varGlobalRefresh\r\n);\r\n\r\n/*\r\n\r\n\r\n// ====================================================================\r\n// FINAL OPTIMIZED: btnCommitFieldConfiguration.OnSelect\r\n// Features: Collection approach + Switch simplification + Config optimization\r\n// ====================================================================\r\n\r\n// 1. VALIDATION\r\nIf(\r\n    IsBlank(varCurrentFieldColumnId) || IsBlank(varFormID),\r\n    Notify(\"Missing field or form information.\", NotificationType.Error);\r\n    Exit()\r\n);\r\n\r\n// 2. GET CURRENT FIELD AND SHAREPOINT DATA\r\nWith(\r\n    {\r\n        currentField: LookUp(colPrimaryFields, targetColumnId = varCurrentFieldColumnId),\r\n        currentConfig: ParseJSON(LookUp('Form Definition Admin', FormID = Text(varFormID), FormConfiguration))\r\n\r\n    },\r\n    \r\n    // 3. BUILD OPTIMIZED FIELD CONFIGURATION\r\n    With(\r\n        {          \r\n            // ===== MERGE BASE + OPTION-SPECIFIC USING YOUR PROVEN APPROACH =====\r\n            finalFieldConfiguration: {\r\n                // Core identifiers (most important)\r\n                fieldId: currentField.fieldId,\r\n                displayOrder: currentField.displayOrder,\r\n                \r\n                // Target column info (essential)\r\n                targetColumnId: currentField.targetColumnId,\r\n                targetColumnTitle: currentField.targetColumnTitle,\r\n                targetColumnType: currentField.targetColumnType,\r\n                targetColumnIndex: currentField.targetColumnIndex,\r\n                \r\n                // Field behavior\r\n                controlType: currentField.controlType,\r\n                isRequired: currentField.isRequired,\r\n                allowMultiSelect: currentField.allowMultiSelect,\r\n                \r\n                // Option source type (set by Switch)\r\n                optionSpecificConfig: Switch(\r\n                    varOptionsSource,                \r\n                    \"external-source\", {\r\n                        optionSourceType: \"external-source\",\r\n                        hasExternalSource: true,\r\n                        externalSource: {\r\n                            sheetId: varConfirmedExternalSheetID,\r\n                            sheetName: varConfirmedSheetName,\r\n                            columnId: Text(varConfirmedExternalColumn.id),\r\n                            columnTitle: varConfirmedExternalColumn.title,\r\n                            columnType: varConfirmedExternalColumn.type,\r\n                            previewCount: CountRows(varPreviewOptions),\r\n                            configuredDate: Text(Now(), \"yyyy-mm-ddThh:mm:ssZ\")\r\n                        }\r\n                    },\r\n                    \r\n                    \"target-combined\", {\r\n                        optionSourceType: \"target-combined\",\r\n                        hasExternalSource: false,\r\n                        sourceConfig: {\r\n                            type: \"TARGET_COMBINED\",\r\n                            useColumnDefinition: true,\r\n                            useTargetSheetData: true,\r\n                            configuredDate: Text(Now(), \"yyyy-mm-ddThh:mm:ssZ\")\r\n                        }\r\n                    },\r\n                    \r\n                    // Default case for \"target-column\" and others\r\n                    {\r\n                        optionSourceType: \"column-definition\",\r\n                        hasExternalSource: false,\r\n                        sourceConfig: {\r\n                            type: \"COLUMN_DEFINITION\",\r\n                            useColumnDefinition: true,\r\n                            configuredDate: Text(Now(), \"yyyy-mm-ddThh:mm:ssZ\")\r\n                        }\r\n                    }\r\n            ),\r\n \r\n\r\n                \r\n                // External source flag\r\n                hasExternalSource: varOptionsSource = \"external-source\",\r\n                \r\n\r\n                \r\n                // Configuration timestamp\r\n                configuredDate: Text(Now(), \"yyyy-mm-ddThh:mm:ssZ\")\r\n            },\r\n            \r\n            // ===== GET EXISTING PRIMARY FIELDS =====\r\n            currentPrimaryFields: If(\r\n                IsBlank(currentConfig.primaryFields) || CountRows(Table(currentConfig.primaryFields)) = 0,\r\n                [],\r\n                Table(currentConfig.primaryFields)\r\n            )\r\n        },\r\n        \r\n        // 4. BUILD COMPLETE PRIMARY FIELDS ARRAY USING YOUR PROVEN COLLECTION APPROACH\r\n        // 4. UPDATE SHAREPOINT JSON CONFIGURATION\r\n        ClearCollect(colFrimaryField, currentPrimaryFields);\r\n        Collect(colFrimaryField,finalFieldConfiguration);\r\n\r\n        // Then add the new field configuration\r\n        Collect(colFinalPrimaryFields, finalFieldConfiguration);\r\n        \r\n        // 5. BUILD UPDATED JSON CONFIGURATION\r\n        Set(varUpdatedFormConfigJSON, JSON({\r\n            formMetadata: {\r\n                version: \"1.2\",\r\n                stage: Text(currentConfig.formMetadata.stage), \r\n                created: Text(currentConfig.formMetadata.created),\r\n                lastModified: Text(Now(), \"yyyy-mm-ddThh:mm:ssZ\")\r\n            },\r\n            sheetConfiguration: currentConfig.sheetConfiguration,\r\n            cascadeFields: currentConfig.cascadeFields,\r\n            \r\n            // Use the complete collection we built\r\n            primaryFields: colFinalPrimaryFields,\r\n            \r\n            secondaryFields: currentConfig.secondaryFields\r\n        }))\r\n    )\r\n);\r\n\r\n// 6. UPDATE SHAREPOINT RECORD\r\nWith(\r\n    {\r\n        externalFieldsCount: CountRows(Filter(colPrimaryFields, hasExternalSource = true))\r\n    },\r\n    \r\n    Patch('Form Definition Admin',\r\n        LookUp('Form Definition Admin', FormID = Text(varFormID)),\r\n        {\r\n            FormConfiguration: varUpdatedFormConfigJSON,\r\n            ModifiedDate: Now(),\r\n            PrimaryCount: CountRows(colPrimaryFields),\r\n            UsesExternalOptions: externalFieldsCount > 0,\r\n            ExternalOptionCount: externalFieldsCount\r\n        }\r\n    )\r\n);\r\n\r\n// 7. UPDATE EXTERNAL SHEETS REGISTRY (only if external source selected)\r\nIf(\r\n    varOptionsSource = \"external-source\" && varExternalSelectionConfirmed,\r\n    Patch(\r\n        'External Option Sheets',\r\n        LookUp('External Option Sheets', SheetID = varConfirmedExternalSheetID),\r\n        {\r\n            UsageCount: LookUp('External Option Sheets', SheetID = varConfirmedExternalSheetID, UsageCount) + 1,\r\n            LastSynced: Now()\r\n        }\r\n    )\r\n);\r\n\r\n// 8. UPDATE LOCAL COLLECTION for UI display\r\nPatch(\r\n    colPrimaryFields,\r\n    LookUp(colPrimaryFields, targetColumnId = varCurrentFieldColumnId),\r\n    {\r\n        hasExternalSource: varOptionsSource = \"external-source\" && varExternalSelectionConfirmed,\r\n        optionSourceType: Switch(\r\n            varOptionsSource,\r\n            \"external-source\", \"external-source\",\r\n            \"target-combined\", \"target-combined\", \r\n            \"column-definition\"\r\n        ),\r\n        isConfigured: true,\r\n        configurationComplete: true,\r\n        lastModified: Now()\r\n    }\r\n);\r\n\r\n// 9. RESET CONFIGURATION STATE\r\nSet(varExternalSelectionConfirmed, false);\r\nSet(varCurrentFieldColumnId, \"\");\r\nSet(varShowConfigPanel, false);\r\n\r\n// 10. SUCCESS NOTIFICATION\r\nWith(\r\n    {\r\n        fieldTitle: LookUp(colPrimaryFields, targetColumnId = varCurrentFieldColumnId, targetColumnTitle),\r\n        sourceType: Switch(\r\n            varOptionsSource,\r\n            \"external-source\", \"External Source (\" & varConfirmedSheetName & \")\",\r\n            \"target-combined\", \"Target Sheet + Column Definition\",\r\n            \"Column Definition Only\"\r\n        )\r\n    },\r\n    Notify(\r\n        \"Field '\" & fieldTitle & \"' configured with \" & sourceType,\r\n        NotificationType.Success,\r\n        3000\r\n    )\r\n);\r\n\r\n// 11. TRIGGER UI REFRESH\r\nSet(varGlobalRefresh, !varGlobalRefresh);\r\n*/"
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Text: ="Comit Config"
+                        X: =302
+                        Y: =314
+      - conExternalSourceModal:
+          Control: GroupContainer@1.3.0
+          Variant: ManualLayout
+          Properties:
+            Fill: =RGBA(0, 0, 0, 0.6)
+            Height: =App.Width/2
+            Visible: =varShowSheetSourcePanel
+            Width: =App.Width/2
+          Children:
+            - conExternalSourceContent:
+                Control: GroupContainer@1.3.0
+                Variant: ManualLayout
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  BorderThickness: =3
+                  Fill: =RGBA(248, 248, 248, 1)
+                  Height: =Parent.Height*90%
+                  Width: =Parent.Width-32
+                  X: =(Parent.Width - Self.Width) / 2
+                  Y: =40
+                Children:
+                  - lblExternalSourceTitle:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Color: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        FontWeight: =FontWeight.Bold
+                        Text: ="Select External Sheet Source"
+                        Width: =Parent.Width*75%
+                        X: =40
+                        Y: =40
+                  - lblExternalSheetID:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        FontWeight: =FontWeight.Semibold
+                        Text: ="Select External Sheet Source"
+                        Width: |+
+                          =Parent.Width/3
+                        X: =40
+                        Y: =lblExternalSourceTitle.Y+lblExternalSourceTitle.Height+16
+                  - btnLoadExternalSheet:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =30
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: "=// ====================================================================\n// SIMPLIFIED: btnLoadExternalSheet.OnSelect\n// Purpose: Load external sheet from registry selection only\n// ====================================================================\n\n// Validate sheet selection\nIf(\n    IsBlank(varSelectedSheetID) || varSelectedSheetID = \"\",\n    Notify(\n        \"Please select a sheet from the list!\",\n        NotificationType.Warning\n    );\n    Exit()\n);\n\n// Check memory cache first\nWith(\n    {\n        cachedSheet: LookUp(\n            colCachedExternalSheets,\n            sheetID = varSelectedSheetID\n        )\n    },\n    If(\n        Not(IsBlank(cachedSheet)),\n        \n        // CACHE HIT: Use existing data\n        Notify(\n            \"Using cached data for: \" & varSelectedSheetName,\n            NotificationType.Information\n        );\n        \n        Set(varGetExternalSheet, cachedSheet.sheetData);\n        Set(varExternalSheetName, cachedSheet.sheetName);\n        Set(varTempExternalRows, Table(cachedSheet.sheetData.rows));\n        Set(varTempExternalColumns, Table(cachedSheet.sheetData.columns)),\n        \n        // CACHE MISS: Load from Smartsheet\n        Set(varLoadingExternalData, true);\n        Notify(\n            \"Loading: \" & varSelectedSheetName,\n            NotificationType.Information\n        );\n\n        // Load external sheet data\n        Set(varGetExternalSheet, Smartsheet.GetSheet(varSelectedSheetID));\n\n        // Check for errors\n        If(\n            IsError(varGetExternalSheet),\n            Set(varLoadingExternalData, false);\n            Notify(\n                \"Failed to load sheet: \" & varSelectedSheetName,\n                NotificationType.Error\n            );\n            Exit()\n        );\n\n        // Extract sheet data\n        Set(varExternalSheetName, Text(varGetExternalSheet.name));\n        Set(varTempExternalRows, Table(varGetExternalSheet.rows));\n        Set(varTempExternalColumns, Table(varGetExternalSheet.columns));\n\n        // Add to memory cache\n        Collect(\n            colCachedExternalSheets,\n            {\n                sheetID: varSelectedSheetID,\n                sheetData: varGetExternalSheet,\n                sheetName: varExternalSheetName,\n                cachedAt: Now(),\n                useCount: 1\n            }\n        );\n        \n        // Update SharePoint registry usage\n        Patch(\n            'External Option Sheets',\n            LookUp('External Option Sheets', SheetID = varSelectedSheetID),\n            {\n                UsageCount: LookUp('External Option Sheets', SheetID = varSelectedSheetID, UsageCount) + 1,\n                LastSynced: Now(),\n                SheetName: varExternalSheetName\n            }\n        );\n        \n        Set(varLoadingExternalData, false)\n    )\n);\n\n// Set target field type for filtering\nSet(varTargetFieldType, varSelectedPrimaryField.targetColumnType);\n\n// Set dynamic row limits for performance\nSet(varRowLimit, 200);\nIf(CountRows(varTempExternalColumns) > 10, Set(varRowLimit, 150));\nIf(CountRows(varTempExternalColumns) > 30, Set(varRowLimit, 100));\nIf(CountRows(varTempExternalColumns) > 50, Set(varRowLimit, 80));\n\n// Clear and flatten sheet data\nClearCollect(colExternalSheetData, []);\n\nForAll(\n    FirstN(varTempExternalRows, varRowLimit),\n    With(\n        {Cells: ThisRecord.cells},\n        ForAll(\n            Cells,\n            If(\n                Not(IsBlank(ThisRecord.displayValue)) && \n                ThisRecord.displayValue <> \"\" && \n                Len(ThisRecord.displayValue) > 0,\n                Collect(\n                    colExternalSheetData,\n                    {\n                        'columnId': ThisRecord.columnId,\n                        'displayValue': ThisRecord.displayValue\n                    }\n                )\n            )\n        )\n    )\n);\n\n// Create column selector with placeholder\nClearCollect(\n    colExternalColumns,\n    {\n        id: 0,\n        title: \"Select a column\",\n        type: \"\"\n    }\n);\n\n// Add compatible columns based on target type\nCollect(\n    colExternalColumns,\n    Switch(\n        varTargetFieldType,\n        \n        \"CONTACT_LIST\",\n        ForAll(\n            Filter(\n                varTempExternalColumns,\n                With(\n                    {\n                        columnData: Filter(colExternalSheetData, columnId = id),\n                        isContactType: type = \"CONTACT_LIST\",\n                        hasEmails: CountRows(Filter(Filter(colExternalSheetData, columnId = id), Find(\"@\", displayValue) > 0)) > 0\n                    },\n                    (isContactType || (type = \"TEXT_NUMBER\" && hasEmails)) &&\n                     CountRows(columnData) > 0\n                )\n            ),\n            {\n                id: ThisRecord.id,\n                title: ThisRecord.title,\n                type: ThisRecord.type\n            }\n        ),\n        \n        \"MULTI_CONTACT_LIST\",\n        ForAll(\n            Filter(\n                varTempExternalColumns,\n                With(\n                    {\n                        columnData: Filter(colExternalSheetData, columnId = id),\n                        isContactType: type = \"CONTACT_LIST\",\n                        hasEmails: CountRows(Filter(Filter(colExternalSheetData, columnId = id), Find(\"@\", displayValue) > 0)) > 0\n                    },\n                    (isContactType || (type = \"TEXT_NUMBER\" && hasEmails)) &&\n                     CountRows(columnData) > 0\n                )\n            ),\n            {\n                id: ThisRecord.id,\n                title: ThisRecord.title,\n                type: ThisRecord.type\n            }\n        ),\n        \n        \"PICKLIST\",\n        ForAll(\n            Filter(\n                varTempExternalColumns,\n                CountRows(Filter(colExternalSheetData, columnId = id)) > 0\n            ),\n            {\n                id: ThisRecord.id,\n                title: ThisRecord.title\n            }\n        ),\n        \n        \"MULTI_PICKLIST\",\n        ForAll(\n            Filter(\n                varTempExternalColumns,\n                CountRows(Filter(colExternalSheetData, columnId = id)) > 0\n            ),\n            {\n                id: ThisRecord.id,\n                title: ThisRecord.title\n            }\n        ),\n        \n        // Default: Basic compatibility\n        ForAll(\n            Filter(\n                varTempExternalColumns,\n                CountRows(Filter(colExternalSheetData, columnId = id)) > 0\n            ),\n            {\n                id: ThisRecord.id,\n                title: ThisRecord.title\n            }\n        )\n    )\n);\n\n\n// Success notification\nWith(\n    {\n        compatibleColumns: CountRows(colExternalColumns) - 1,\n        totalColumns: CountRows(varTempExternalColumns),\n        dataCount: CountRows(colExternalSheetData)\n    },\n    If(\n        compatibleColumns > 0 && dataCount > 0,\n        Notify(\n            \"✅ \" & varSelectedSheetName & \": \" & compatibleColumns & \" of \" & totalColumns & \" columns compatible\",\n            NotificationType.Success\n        );\n        Set(varShowColumnSelector, true),\n        \n        Notify(\n            \"⚠️ No compatible columns found for \" & varTargetFieldType,\n            NotificationType.Warning\n        );\n        Set(varShowColumnSelector, false)\n    )\n);"
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Load Selected Sheet"
+                        Visible: =Not(IsBlank(varSelectedSheetID)) && varSelectedSheetID <> ""
+                        Width: =200
+                        X: =cmbExternalSheetSelector.X+30
+                        Y: =149
+                  - ddlExternalColumnSelector:
+                      Control: Classic/DropDown@2.3.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        ChevronBackground: =RGBA(56, 96, 178, 1)
+                        ChevronFill: =RGBA(255, 255, 255, 1)
+                        ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                        Default: =
+                        Font: =Font.'Open Sans'
+                        Height: =36
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Items: =colExternalColumns
+                        Items.Value: =title
+                        OnChange: |-
+                          =// ====================================================================
+                          // ddlExternalColumnSelector.OnChange - Clean Version Without Splitting
+                          // Purpose: Handle column selection and generate simple preview
+                          // ====================================================================
+
+                          // Check if placeholder is selected
+                          If(
+                              Self.Selected.id = 0,
+                              // Placeholder selected - clear preview
+                              Set(varSelectedExternalColumn, Blank());
+                              Set(varPreviewOptions, Table({Value: "Please select a column first"}));
+                              Set(varPreviewGenerated, false);
+                              Exit()
+                          );
+
+                          // Real column selected - store selection
+                          Set(varSelectedExternalColumn, Self.Selected);
+
+                          // Generate simple preview - show raw values (no splitting)
+                          Set(varPreviewOptions,
+                              Distinct(
+                                  Filter(
+                                      colExternalSheetData,
+                                      columnId = varSelectedExternalColumn.id
+                                  ),
+                                  displayValue
+                              )
+                          );
+
+                          // Set preview state
+                          Set(varPreviewGenerated, true);
+
+                          // Success notification with preview info
+                          Notify(
+                              "Preview generated: " & CountRows(varPreviewOptions) & " values from '" & 
+                              varSelectedExternalColumn.title & "'" & Char(10) &
+                              "Final processing will be handled during commit",
+                              NotificationType.Information,
+                              2000
+                          );
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 18, 107, 1)
+                        SelectionColor: =RGBA(255, 255, 255, 1)
+                        SelectionFill: =RGBA(56, 96, 178, 1)
+                        Width: =Parent.Width/2-20
+                        X: =Parent.Width/2 -20
+                        Y: |+
+                          =btnLoadExternalSheet.Y + btnLoadExternalSheet.Height + 80
+                  - lblExternalSheetName:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        Text: =varExternalSheetName
+                        Width: |
+                          =Parent.Width/3
+                        X: =40
+                        Y: |+
+                          =btnLoadExternalSheet.Y + btnLoadExternalSheet.Height + 80
+                  - ddlPreviewColumnExternal:
+                      Control: Classic/DropDown@2.3.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        ChevronBackground: =RGBA(56, 96, 178, 1)
+                        ChevronFill: =RGBA(255, 255, 255, 1)
+                        ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                        Font: =Font.'Open Sans'
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Items: |-
+                          =// Distinct(Filter(colExternalSheetData,columnId=ddlExternalColumnSelector.Selected.id),displayValue)
+
+                          varPreviewOptions
+                        Items.Value: =Value
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 18, 107, 1)
+                        SelectionColor: =RGBA(255, 255, 255, 1)
+                        SelectionFill: =RGBA(56, 96, 178, 1)
+                        Width: =Parent.Width/2-20
+                        X: =Parent.Width/2 -20
+                        Y: =ddlExternalColumnSelector.Y+ddlExternalColumnSelector.Height +20
+                  - btnConfirmExternalSelection:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =30
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: |-
+                          =Set(varConfirmedExternalColumn, varSelectedExternalColumn);
+                          Set(varConfirmedExternalSheetID, varSelectedSheetID);
+                          Set(varConfirmedSheetName,varExternalSheetName);
+                          Set(varExternalSelectionConfirmed, true);
+                          Set(varShowExternalModal, false);
+
+                          Set(varShowExternalConfig, true);
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Use This Column"
+                        Width: = cmbExternalSheetSelector.Width*75%
+                        X: =cmbExternalSheetSelector.X+30
+                        Y: =ddlPreviewColumnExternal.Y + ddlPreviewColumnExternal.Height + 20
+                  - lblExternalConfiguration:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Color: =RGBA(16, 124, 16, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =107
+                        Size: =10
+                        Text: |-
+                          ="Sheet: " & varExternalSheetName & Char(10) &
+                          "ID: " & varConfirmedExternalSheetID  & Char(10) &
+                          "Column: " & varConfirmedExternalColumn.title & Char(10) & 
+                          "ID: " & varConfirmedExternalColumn.id & ")" & Char(10) &
+                          "Sample: " & Concat(FirstN(varPreviewOptions, 3), Value, ", ") & 
+                          If(CountRows(varPreviewOptions) > 3, "...", "")
+                        Visible: =varShowExternalConfig && Not(IsBlank(varConfirmedExternalColumn))
+                        Width: =Parent.Width*75%
+                        X: =40
+                        Y: =btnConfirmExternalSelection.Y+btnConfirmExternalSelection.Height+20
+                  - btnCloseExternalPanel:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: = RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: '= RGBA(16, 124, 16, 1) '
+                        Font: =Font.'Open Sans'
+                        Height: =30
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: |-
+                          =Set(
+                              varShowSheetSourcePanel,
+                              false
+                          )
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Text: ="""Close & Continue"""
+                        Visible: =varShowExternalConfig && Not(IsBlank(varConfirmedExternalColumn))
+                        Width: =200
+                        X: =cmbExternalSheetSelector.X+30
+                        Y: =lblExternalConfiguration.Y + lblExternalConfiguration.Height+20
+                  - cmbExternalSheetSelector:
+                      Control: Classic/ComboBox@2.4.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        ChevronBackground: =RGBA(56, 96, 178, 1)
+                        ChevronFill: =RGBA(255, 255, 255, 1)
+                        ChevronHoverBackground: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        ChevronHoverFill: =RGBA(255, 255, 255, 1)
+                        DisplayFields: =["DisplayText","Category"]
+                        Font: =Font.'Open Sans'
+                        HoverFill: =RGBA(186, 202, 226, 1)
+                        Items: |-
+                          =// ====================================================================
+                          // SIMPLIFIED: cmbExternalSheetSelector.Items
+                          // Purpose: Load only SharePoint registry sheets (no "Add New" option)
+                          // ====================================================================
+                          // Items property:
+                          SortByColumns(
+                              ForAll(
+                                  colExternalSheetsRegistry,
+                                  {
+                                      SheetID: SheetID,
+                                      DisplayName: DisplayName,
+                                      Description: Description,
+                                      Category: Category.Value,
+                                      DisplayText: DisplayName & " (" & SheetID & ")" & If(
+                                          UsageCount > 1,
+                                          " • " & UsageCount & " forms",
+                                          ""
+                                      )
+                                  }
+                              ),
+                              "Category", SortOrder.Ascending,
+                              "DisplayName", SortOrder.Ascending
+                          )
+                        OnChange: |-
+                          =// SIMPLIFIED: cmbExternalSheetSelector.OnChange
+                          // Purpose: Handle sheet selection from SharePoint registry only
+                          // ====================================================================
+
+                          // Set selected sheet variables from registry record
+                          Set(varSelectedSheetID, Self.Selected.SheetID);
+                          Set(varSelectedSheetName, Self.Selected.DisplayName);
+                          Set(varSelectedSheetDescription, Self.Selected.Description);
+
+                          // Optional: Show selection confirmation
+                          Notify(
+                              "Selected: " & Self.Selected.DisplayName,
+                              NotificationType.Information,
+                              1000
+                          );
+                        OnSelect: =
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 18, 107, 1)
+                        SearchFields: =["DisplayName"]
+                        SelectMultiple: =false
+                        SelectionColor: =RGBA(255, 255, 255, 1)
+                        SelectionFill: =RGBA(56, 96, 178, 1)
+                        Width: =Parent.Width/2-20
+                        X: =Parent.Width/2 -20
+                        Y: =98
+                  - btnAddNewSheet:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =30
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: |-
+                          =Reset(txtSheetID);
+                          Clear(colSheet);
+                          Set(varBackFromscnAddExternalSheetAddToRegistry, false);
+                          Navigate(
+                              conScnAddExternalSheet,
+                              ScreenTransition.Fade
+                          )
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="+  Add New Sheet"
+                        X: =68
+                        Y: =156
+                  - btnUpdateList:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =30
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: |-
+                          =// update colExternalSheetsRegistry,
+                          ClearCollect(
+                              colExternalSheetsRegistry,
+                              Filter(
+                                  'External Option Sheets',
+                                  Status.Value = "Active"
+                              )
+                          );
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Size: =12
+                        Text: ="Update list"
+                        X: =68
+                        Y: =204
